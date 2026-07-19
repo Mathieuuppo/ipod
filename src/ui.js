@@ -27,6 +27,65 @@ export class UI {
 
     this.dessinerDrapeaux();
     this.initTrace();
+    this.initControlesArcade();
+  }
+
+  // ---------- Contrôles arcade : joystick + boutons d'action ----------
+
+  initControlesArcade() {
+    this.joystick = { x: 0, y: 0, actif: false }; // vecteur normalisé (-1..1)
+    this.surPasse = null;  // callbacks branchés par le mode arcade
+    this.surTirArcade = null;
+
+    const zone = $('joystick');
+    const tete = $('joystick-tete');
+    const RAYON = 46; // course maximale de la tête (px)
+
+    const majDepuisPointeur = (e) => {
+      const rect = zone.getBoundingClientRect();
+      let dx = e.clientX - (rect.left + rect.width / 2);
+      let dy = e.clientY - (rect.top + rect.height / 2);
+      const d = Math.hypot(dx, dy);
+      if (d > RAYON) { dx *= RAYON / d; dy *= RAYON / d; }
+      tete.style.transform = `translate(${dx}px, ${dy}px)`;
+      this.joystick.x = dx / RAYON;
+      this.joystick.y = dy / RAYON;
+    };
+    zone.addEventListener('pointerdown', (e) => {
+      zone.setPointerCapture(e.pointerId);
+      this.joystick.actif = true;
+      majDepuisPointeur(e);
+    });
+    zone.addEventListener('pointermove', (e) => {
+      if (this.joystick.actif) majDepuisPointeur(e);
+    });
+    const relacher = () => {
+      this.joystick.actif = false;
+      this.joystick.x = 0; this.joystick.y = 0;
+      tete.style.transform = 'translate(0, 0)';
+    };
+    zone.addEventListener('pointerup', relacher);
+    zone.addEventListener('pointercancel', relacher);
+
+    // Boutons d'action : déclenchés dès l'appui (réactivité mobile)
+    $('btn-action-passe').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (this.surPasse) this.surPasse();
+    });
+    $('btn-action-tir').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (this.surTirArcade) this.surTirArcade();
+    });
+  }
+
+  montrerControlesArcade(visible) {
+    $('controles-arcade').classList.toggle('cache', !visible);
+  }
+
+  // Le libellé des boutons change selon la possession (PASSE/TIR ↔ JOUEUR/TACLE)
+  libellesArcade(possession) {
+    $('btn-action-passe').textContent = possession ? 'PASSE' : 'JOUEUR';
+    $('btn-action-tir').textContent = possession ? 'TIR' : 'TACLE';
   }
 
   // ---------- Ligne de trajectoire (tir façon Score Hero) ----------
@@ -119,7 +178,7 @@ export class UI {
   }
 
   rafraichirEtoilesModes() {
-    for (const mode of ['freekick', 'penalty', 'match']) {
+    for (const mode of ['freekick', 'penalty', 'match', 'arcade']) {
       $(`etoiles-${mode}`).textContent = sauvegarde.resumeEtoiles(mode);
     }
   }

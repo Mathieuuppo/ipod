@@ -1,19 +1,26 @@
 // ============================================================
-// Monde 3D (Three.js) : stade, pelouse, cage, foule, joueurs
-// voxel, ballon et flèche de visée.
+// Monde 3D (Three.js) : stade complet, pelouse, cages, foule,
+// joueurs voxel, ballon et flèche de visée.
 //
 // Convention d'axes :
-//   x = latéral (droite positive vue caméra), y = hauteur,
-//   z = profondeur — la LIGNE DE BUT est à z = 0, le ballon à z > 0,
-//   le tir part vers -z. La caméra est derrière le tireur.
+//   x = latéral, y = hauteur, z = profondeur.
+//   Le terrain complet va de z = 0 (cage A, celle des tirs) à
+//   z = 50 (cage B), x ∈ [-20, 20]. Les coups francs se tirent
+//   vers la cage A ; le mode arcade utilise tout le terrain.
 //
 // Les personnages sont des assemblages de cubes ("voxel figurines")
-// construits par des fonctions dédiées : facile de les remplacer
-// plus tard par de vrais modèles glTF sans toucher au reste du jeu.
+// construits par creerFigurine() : facile de les remplacer plus
+// tard par de vrais modèles glTF sans toucher au reste du jeu.
 // ============================================================
 
 import * as THREE from 'three';
 import { CONFIG, alea, clamp } from './config.js';
+
+// Dimensions du terrain complet (mode arcade)
+export const TERRAIN = {
+  demiLargeur: 20,   // x ∈ [-20, 20]
+  longueur: 50,      // z ∈ [0, 50]
+};
 
 // ---------- Petites textures générées (aucun asset externe) ----------
 
@@ -45,15 +52,15 @@ function textureCiel() {
 function texturePelouse() {
   // Bandes de tonte : deux tons de vert alternés
   const c = document.createElement('canvas');
-  c.width = 64; c.height = 512;
+  c.width = 64; c.height = 128;
   const g = c.getContext('2d');
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 2; i++) {
     g.fillStyle = i % 2 === 0 ? '#3f9e3f' : '#54b654';
     g.fillRect(0, i * 64, 64, 64);
   }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(1, 2);
+  t.repeat.set(1, 10);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
@@ -120,7 +127,7 @@ export function creerFigurine({ maillot = 0x2255cc, short = 0xffffff, peau = 0xf
   jambeG.position.set(-0.11, 0.21, 0);
   const jambeD = jambeG.clone();
   jambeD.position.x = 0.11;
-  // Pivot des jambes en haut pour l'animation de frappe
+  // Pivot des jambes en haut pour l'animation de frappe / de course
   jambeG.geometry = jambeG.geometry.clone();
   jambeG.geometry.translate(0, -0.21, 0); jambeG.position.y = 0.42;
   jambeD.geometry = jambeD.geometry.clone();
@@ -153,9 +160,9 @@ export class Monde {
   constructor(conteneur) {
     this.scene = new THREE.Scene();
     this.scene.background = textureCiel();
-    this.scene.fog = new THREE.Fog(0xa9cdec, 28, 85);
+    this.scene.fog = new THREE.Fog(0xa9cdec, 40, 150);
 
-    this.camera = new THREE.PerspectiveCamera(58, 1, 0.1, 200);
+    this.camera = new THREE.PerspectiveCamera(58, 1, 0.1, 300);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -167,10 +174,12 @@ export class Monde {
     this.tweens = [];        // petites animations temporisées
     this.tempsSecousse = 0;  // secousse d'écran restante (poteau)
     this.horloge = new THREE.Clock();
+    this.cameraArcade = false;
 
     this.construireEclairage();
     this.construireTerrain();
-    this.construireCage();
+    this.construireCage(0, 0);                  // cage A (tirs)
+    this.construireCage(TERRAIN.longueur, Math.PI); // cage B (arcade)
     this.construireTribunes();
     this.construireActeurs();
     this.construireFleche();
@@ -182,53 +191,66 @@ export class Monde {
   construireEclairage() {
     this.scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x3f7a3f, 0.9));
     const soleil = new THREE.DirectionalLight(0xffffff, 1.6);
-    soleil.position.set(-8, 18, 10);
+    soleil.position.set(-14, 30, 24);
     soleil.castShadow = true;
     soleil.shadow.mapSize.set(1024, 1024);
-    soleil.shadow.camera.left = -15; soleil.shadow.camera.right = 15;
-    soleil.shadow.camera.top = 25; soleil.shadow.camera.bottom = -10;
-    soleil.shadow.camera.far = 60;
+    soleil.shadow.camera.left = -30; soleil.shadow.camera.right = 30;
+    soleil.shadow.camera.top = 60; soleil.shadow.camera.bottom = -15;
+    soleil.shadow.camera.far = 120;
     this.scene.add(soleil);
   }
 
   construireTerrain() {
+    const L = TERRAIN.longueur, D = TERRAIN.demiLargeur;
+
     const sol = new THREE.Mesh(
-      new THREE.PlaneGeometry(60, 60),
+      new THREE.PlaneGeometry(120, 160),
       new THREE.MeshLambertMaterial({ map: texturePelouse() })
     );
     sol.rotation.x = -Math.PI / 2;
-    sol.position.z = 5;
+    sol.position.z = L / 2;
     sol.receiveShadow = true;
     this.scene.add(sol);
 
-    // Lignes blanches : ligne de but + surface de réparation (simplifiées)
+    // ----- Lignes blanches du terrain complet -----
     const matLigne = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const ligneBut = new THREE.Mesh(new THREE.PlaneGeometry(40, 0.12), matLigne);
-    ligneBut.rotation.x = -Math.PI / 2;
-    ligneBut.position.set(0, 0.01, 0);
-    this.scene.add(ligneBut);
-    const surface = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 16.5), matLigne);
-    surface.rotation.x = -Math.PI / 2;
-    for (const cote of [-1, 1]) {
-      const l = surface.clone();
-      l.position.set(cote * 10, 0.01, 8.25);
-      this.scene.add(l);
+    const ligne = (largeur, longueur, x, z) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(largeur, longueur), matLigne);
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(x, 0.01, z);
+      this.scene.add(m);
+    };
+    // Lignes de but et lignes de touche
+    ligne(D * 2 + 0.12, 0.12, 0, 0);
+    ligne(D * 2 + 0.12, 0.12, 0, L);
+    ligne(0.12, L, D, L / 2);
+    ligne(0.12, L, -D, L / 2);
+    // Ligne médiane + rond central
+    ligne(D * 2, 0.12, 0, L / 2);
+    const rond = new THREE.Mesh(new THREE.RingGeometry(5.4, 5.55, 48), matLigne);
+    rond.rotation.x = -Math.PI / 2;
+    rond.position.set(0, 0.01, L / 2);
+    this.scene.add(rond);
+    // Surfaces de réparation des deux côtés
+    for (const [zBase, sens] of [[0, 1], [L, -1]]) {
+      ligne(0.12, 12, 10, zBase + sens * 6);
+      ligne(0.12, 12, -10, zBase + sens * 6);
+      ligne(20, 0.12, 0, zBase + sens * 12);
     }
-    const surfaceFace = new THREE.Mesh(new THREE.PlaneGeometry(20, 0.12), matLigne);
-    surfaceFace.rotation.x = -Math.PI / 2;
-    surfaceFace.position.set(0, 0.01, 16.5);
-    this.scene.add(surfaceFace);
   }
 
-  construireCage() {
+  construireCage(zCage, rotationY) {
+    // Repère local : la cage "regarde" vers +z avant rotation
     const L = CONFIG.butDemiLargeur, H = CONFIG.butHauteur, prof = 1.6;
+    const cage = new THREE.Group();
+
     const matPoteau = new THREE.MeshLambertMaterial({ color: 0xffffff });
     const geoPoteau = new THREE.CylinderGeometry(CONFIG.rayonPoteau, CONFIG.rayonPoteau, H, 10);
     for (const cote of [-1, 1]) {
       const p = new THREE.Mesh(geoPoteau, matPoteau);
       p.position.set(cote * L, H / 2, 0);
       p.castShadow = true;
-      this.scene.add(p);
+      cage.add(p);
     }
     const barre = new THREE.Mesh(
       new THREE.CylinderGeometry(CONFIG.rayonPoteau, CONFIG.rayonPoteau, L * 2 + 0.14, 10),
@@ -237,7 +259,7 @@ export class Monde {
     barre.rotation.z = Math.PI / 2;
     barre.position.set(0, H, 0);
     barre.castShadow = true;
-    this.scene.add(barre);
+    cage.add(barre);
 
     // Filet : fond + côtés + toit en grille semi-transparente
     const matFilet = new THREE.MeshBasicMaterial({
@@ -246,7 +268,7 @@ export class Monde {
     matFilet.map.repeat.set(8, 3);
     const fond = new THREE.Mesh(new THREE.PlaneGeometry(L * 2, H), matFilet);
     fond.position.set(0, H / 2, -prof);
-    this.scene.add(fond);
+    cage.add(fond);
     const matFiletCote = matFilet.clone();
     matFiletCote.map = matFilet.map.clone();
     matFiletCote.map.repeat.set(2, 3);
@@ -254,7 +276,7 @@ export class Monde {
       const flanc = new THREE.Mesh(new THREE.PlaneGeometry(prof, H), matFiletCote);
       flanc.rotation.y = Math.PI / 2;
       flanc.position.set(cote * L, H / 2, -prof / 2);
-      this.scene.add(flanc);
+      cage.add(flanc);
     }
     const matFiletToit = matFilet.clone();
     matFiletToit.map = matFilet.map.clone();
@@ -262,44 +284,103 @@ export class Monde {
     const toit = new THREE.Mesh(new THREE.PlaneGeometry(L * 2, prof), matFiletToit);
     toit.rotation.x = Math.PI / 2;
     toit.position.set(0, H, -prof / 2);
-    this.scene.add(toit);
+    cage.add(toit);
+
+    cage.position.z = zCage;
+    cage.rotation.y = rotationY;
+    this.scene.add(cage);
   }
 
   construireTribunes() {
-    // Gradins : gros blocs gris derrière le but, adoucis par le brouillard
+    const L = TERRAIN.longueur;
     const matGradin = new THREE.MeshLambertMaterial({ color: 0x8a8f99 });
-    for (let etage = 0; etage < 3; etage++) {
-      const g = new THREE.Mesh(new THREE.BoxGeometry(58, 3.2, 6), matGradin);
-      g.position.set(0, 1.6 + etage * 3.2, -8 - etage * 6);
-      this.scene.add(g);
-    }
-    // Foule : petits cubes colorés instanciés aux couleurs des deux équipes
-    const couleurs = [0x2255cc, 0xcc3333, 0xffffff, 0xf0d040, 0x333366, 0x993333];
-    const nb = 900;
+    const matToit = new THREE.MeshLambertMaterial({ color: 0xe8e8ee });
+    const positionsFoule = [];
+
+    // Un côté de tribune = 3 étages de gradins + un bandeau de toit.
+    // axe 'z' : tribune face au nord/sud (derrière les cages) ;
+    // axe 'x' : tribune latérale le long du terrain.
+    const tribune = (axe, coord, centre, longueur) => {
+      for (let etage = 0; etage < 3; etage++) {
+        const profondeur = 6, hauteur = 3.4;
+        const g = new THREE.Mesh(
+          axe === 'z'
+            ? new THREE.BoxGeometry(longueur, hauteur, profondeur)
+            : new THREE.BoxGeometry(profondeur, hauteur, longueur),
+          matGradin
+        );
+        const recul = etage * profondeur;
+        const y = hauteur / 2 + etage * hauteur;
+        if (axe === 'z') g.position.set(centre, y, coord + Math.sign(coord - 25) * recul);
+        else g.position.set(coord + Math.sign(coord) * recul, y, centre);
+        this.scene.add(g);
+
+        // Emplacements de supporters sur le dessus de chaque étage
+        const nb = Math.floor(longueur / 0.55);
+        for (let i = 0; i < nb; i++) {
+          const le = -longueur / 2 + 0.3 + i * 0.55 + alea(-0.15, 0.15);
+          const pr = alea(-2.4, 2.4);
+          if (axe === 'z') {
+            positionsFoule.push([centre + le, y + hauteur / 2 + 0.3, coord + Math.sign(coord - 25) * recul + pr]);
+          } else {
+            positionsFoule.push([coord + Math.sign(coord) * recul + pr, y + hauteur / 2 + 0.3, centre + le]);
+          }
+        }
+      }
+      // Bandeau de toit au sommet
+      const toit = new THREE.Mesh(
+        axe === 'z' ? new THREE.BoxGeometry(longueur + 4, 0.7, 8) : new THREE.BoxGeometry(8, 0.7, longueur + 4),
+        matToit
+      );
+      if (axe === 'z') toit.position.set(centre, 11.5, coord + Math.sign(coord - 25) * 13);
+      else toit.position.set(coord + Math.sign(coord) * 13, 11.5, centre);
+      this.scene.add(toit);
+    };
+
+    tribune('z', -9, 0, 64);        // derrière la cage A
+    tribune('z', L + 9, 0, 64);     // derrière la cage B
+    tribune('x', 27, L / 2, 74);    // tribune latérale droite
+    tribune('x', -27, L / 2, 74);   // tribune latérale gauche
+
+    // Foule : cubes colorés instanciés aux couleurs des deux équipes
+    const couleurs = [0x2255cc, 0xcc3333, 0xffffff, 0xf0d040, 0x333366, 0x993333, 0x77aadd];
     const geo = new THREE.BoxGeometry(0.42, 0.5, 0.3);
-    const mat = new THREE.MeshLambertMaterial();
-    this.foule = new THREE.InstancedMesh(geo, mat, nb);
+    this.foule = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial(), positionsFoule.length);
     const m = new THREE.Matrix4();
     const coul = new THREE.Color();
-    for (let i = 0; i < nb; i++) {
-      const etage = Math.floor(Math.random() * 3);
-      const x = alea(-27, 27);
-      const y = 3.2 + etage * 3.2 + alea(-0.1, 0.1);
-      const z = -8 - etage * 6 + alea(-2.5, 2.5);
-      m.setPosition(x, y, z);
+    positionsFoule.forEach((p, i) => {
+      m.setPosition(p[0], p[1], p[2]);
       this.foule.setMatrixAt(i, m);
       this.foule.setColorAt(i, coul.setHex(couleurs[Math.floor(Math.random() * couleurs.length)]));
-    }
+    });
     this.foule.instanceMatrix.needsUpdate = true;
     this.scene.add(this.foule);
 
-    // Panneaux publicitaires unis derrière la ligne de but
-    const pub = new THREE.Mesh(
-      new THREE.BoxGeometry(40, 0.9, 0.2),
-      new THREE.MeshLambertMaterial({ color: 0x2a6fd6 })
-    );
-    pub.position.set(0, 0.45, -4.5);
-    this.scene.add(pub);
+    // Projecteurs aux quatre coins du stade
+    const matPylone = new THREE.MeshLambertMaterial({ color: 0x666a72 });
+    const matLampe = new THREE.MeshBasicMaterial({ color: 0xfff8dd });
+    for (const [x, z] of [[-30, -14], [30, -14], [-30, L + 14], [30, L + 14]]) {
+      const pylone = new THREE.Mesh(new THREE.BoxGeometry(0.8, 20, 0.8), matPylone);
+      pylone.position.set(x, 10, z);
+      this.scene.add(pylone);
+      const lampe = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.6, 0.6), matLampe);
+      lampe.position.set(x, 21, z);
+      lampe.lookAt(0, 0, L / 2);
+      this.scene.add(lampe);
+    }
+
+    // Panneaux publicitaires autour du terrain
+    const matPub = new THREE.MeshLambertMaterial({ color: 0x2a6fd6 });
+    const pub = (l, x, z, rot) => {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(l, 0.9, 0.2), matPub);
+      p.position.set(x, 0.45, z);
+      p.rotation.y = rot;
+      this.scene.add(p);
+    };
+    pub(44, 0, -4.2, 0);
+    pub(44, 0, L + 4.2, 0);
+    pub(L + 6, 24, L / 2, Math.PI / 2);
+    pub(L + 6, -24, L / 2, Math.PI / 2);
   }
 
   construireActeurs() {
@@ -317,7 +398,6 @@ export class Monde {
 
     // Gardien (tenue orange pour trancher)
     this.gardien = creerFigurine({ maillot: 0xf07820, short: 0x222222, cheveux: 0x553311 });
-    // Bras écartés en position d'attente
     this.gardien.userData.brasG.rotation.z = 0.9;
     this.gardien.userData.brasD.rotation.z = -0.9;
     this.scene.add(this.gardien);
@@ -326,7 +406,6 @@ export class Monde {
     this.mur = [];
     for (let i = 0; i < 5; i++) {
       const j = creerFigurine({ maillot: 0x7a7a85, short: 0x55555c, cheveux: 0x2b2118 });
-      // Bras le long du corps, mains "protégées" (posture de mur)
       j.userData.brasG.rotation.x = -0.5;
       j.userData.brasD.rotation.x = -0.5;
       j.visible = false;
@@ -351,7 +430,73 @@ export class Monde {
     this.scene.add(this.fleche);
   }
 
-  // ---------- Mise en place des scénarios ----------
+  // ---------- Mode arcade : acteurs dédiés ----------
+
+  // Crée (une seule fois) les deux équipes du mode arcade et les
+  // marqueurs (anneau jaune = joueur contrôlé, blanc = porteur).
+  creerActeursArcade(nbParEquipe) {
+    if (this.arcade) return this.arcade;
+    const bleu = [], rouge = [];
+    for (let i = 0; i < nbParEquipe; i++) {
+      const b = creerFigurine({ maillot: 0x2255cc, short: 0xffffff, cheveux: [0x1a1a1a, 0x553311, 0xc8a04a][i % 3] });
+      const r = creerFigurine({ maillot: 0xcc3333, short: 0xffffff, cheveux: [0x2b2118, 0x1a1a1a, 0x774422][i % 3] });
+      this.scene.add(b, r);
+      bleu.push(b); rouge.push(r);
+    }
+    const gardienBleu = creerFigurine({ maillot: 0x22aa66, short: 0x222222, cheveux: 0x1a1a1a });
+    const gardienRouge = creerFigurine({ maillot: 0xf07820, short: 0x222222, cheveux: 0x553311 });
+    this.scene.add(gardienBleu, gardienRouge);
+
+    const anneau = (couleur) => {
+      const a = new THREE.Mesh(
+        new THREE.RingGeometry(0.42, 0.58, 24),
+        new THREE.MeshBasicMaterial({ color: couleur, transparent: true, opacity: 0.85 })
+      );
+      a.rotation.x = -Math.PI / 2;
+      a.position.y = 0.03;
+      this.scene.add(a);
+      return a;
+    };
+    this.arcade = {
+      bleu, rouge, gardienBleu, gardienRouge,
+      anneauControle: anneau(0xffe000),
+      anneauPorteur: anneau(0xffffff),
+    };
+    this.montrerActeursArcade(false);
+    return this.arcade;
+  }
+
+  montrerActeursArcade(visible) {
+    if (!this.arcade) return;
+    for (const j of [...this.arcade.bleu, ...this.arcade.rouge,
+      this.arcade.gardienBleu, this.arcade.gardienRouge,
+      this.arcade.anneauControle, this.arcade.anneauPorteur]) {
+      j.visible = visible;
+    }
+  }
+
+  // Bascule décor tirs ↔ décor arcade (cache tireur/mur/gardien de tir)
+  modeArcade(actif) {
+    this.cameraArcade = actif;
+    this.tireur.visible = !actif;
+    this.gardien.visible = !actif;
+    if (actif) for (const j of this.mur) j.visible = false;
+    this.montrerActeursArcade(actif);
+    this.fleche.visible = false;
+  }
+
+  // Caméra "FIFA vue de haut" : au-dessus du ballon, inclinée vers
+  // l'avant, avec un lissage pour suivre l'action sans à-coups.
+  suivreCameraArcade(cibleX, cibleZ, dt) {
+    const zVue = clamp(cibleZ, 6, TERRAIN.longueur - 6);
+    const posVoulue = new THREE.Vector3(cibleX * 0.45, 24, zVue + 12);
+    const k = Math.min(dt * 4, 1);
+    this.camera.position.lerp(posVoulue, k);
+    this.cibleCamera = new THREE.Vector3(cibleX * 0.6, 0, zVue - 2);
+    this.camera.lookAt(this.cibleCamera);
+  }
+
+  // ---------- Mise en place des scénarios de tir ----------
 
   // Positionne ballon/tireur/gardien/mur pour un coup franc.
   // distance = recul du ballon par rapport à la ligne de but.

@@ -13,6 +13,7 @@ const DEFAUT = {
     freekick: { facile: 0, moyen: 0, difficile: 0 },
     penalty: { facile: 0, moyen: 0, difficile: 0 },
     match: { facile: 0, moyen: 0, difficile: 0 },
+    arcade: { facile: 0, moyen: 0, difficile: 0 },
   },
 };
 

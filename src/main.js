@@ -12,6 +12,7 @@ import { initAudio, sons } from './audio.js';
 import { ModeCoupFranc } from './modes/freekick.js';
 import { ModePenalty } from './modes/penalty.js';
 import { ModeMatch } from './modes/match.js';
+import { ModeArcade } from './modes/arcade.js';
 
 // ---------- Construction ----------
 
@@ -38,6 +39,7 @@ const FABRIQUES = {
   freekick: () => new ModeCoupFranc(ctx),
   penalty: () => new ModePenalty(ctx),
   match: () => new ModeMatch(ctx),
+  arcade: () => new ModeArcade(ctx),
 };
 
 // ---------- Navigation ----------

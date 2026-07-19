@@ -42,6 +42,13 @@ export const CONFIG = {
 
   // Mode match : 1 minute de jeu = ce nombre de secondes réelles
   secondesParMinuteMatch: 1.4,
+
+  // Mode arcade (vue FIFA) : rythme et équipes
+  arcadeJoueursParEquipe: 5,      // joueurs de champ par équipe (+ 1 gardien)
+  arcadeSecondesParMinute: 2.0,   // 90' ≈ 3 minutes réelles
+  arcadeVitesseJoueur: 7.5,       // m/s du joueur contrôlé
+  arcadeVitessePasse: 15,
+  arcadeVitesseTir: 21,
 };
 
 // Réglages par difficulté : plus c'est dur, plus le gardien lit le tir
@@ -55,6 +62,9 @@ export const DIFFICULTES = {
     iaChanceButPenalty: 0.55,  // proba que l'IA marque son penalty
     iaChanceButMatch: 0.30,    // proba de but IA par occasion adverse (match)
     timingZone: 0.30,          // largeur relative de la zone verte du mini-jeu
+    arcadeVitesseIA: 5.2,      // vitesse de course des adversaires (m/s)
+    arcadePrecisionIA: 0.30,   // précision des tirs adverses (0..1)
+    arcadeReactionIA: 0.9,     // agressivité défensive de l'IA (0..1)
   },
   moyen: {
     label: 'Moyen',
@@ -64,6 +74,9 @@ export const DIFFICULTES = {
     iaChanceButPenalty: 0.70,
     iaChanceButMatch: 0.45,
     timingZone: 0.20,
+    arcadeVitesseIA: 6.2,
+    arcadePrecisionIA: 0.45,
+    arcadeReactionIA: 0.6,
   },
   difficile: {
     label: 'Difficile',
@@ -73,6 +86,9 @@ export const DIFFICULTES = {
     iaChanceButPenalty: 0.82,
     iaChanceButMatch: 0.60,
     timingZone: 0.13,
+    arcadeVitesseIA: 7.2,
+    arcadePrecisionIA: 0.62,
+    arcadeReactionIA: 0.35,
   },
 };
 

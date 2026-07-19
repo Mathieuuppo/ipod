@@ -30,6 +30,10 @@ dans `assets/vendor/`.
 - **🏆 Match** — 90 minutes accélérées : une succession d'occasions
   (coup franc, penalty ou mini-jeu de timing) pendant que l'IA marque
   selon la difficulté.
+- **🎮 Match Arcade** — un vrai match jouable vu d'en haut (façon FIFA
+  rétro) : joystick virtuel pour courir et dribbler, boutons PASSE / TIR
+  en attaque, JOUEUR / TACLE en défense. 5 joueurs + gardien par équipe,
+  IA de position pour les coéquipiers et les adversaires.
 
 Trois difficultés (facile / moyen / difficile) qui règlent la lecture du
 tir par le gardien, sa vitesse de réaction et le timing du mur.
@@ -44,6 +48,9 @@ tir par le gardien, sa vitesse de réaction et le timing du mur.
     enroulé qui contourne le mur avant de revenir sur la cible.
 - Mini-jeu de timing (mode match) : taper quand le curseur est dans la
   zone verte.
+- Mode arcade : joystick virtuel en bas à gauche (pousser vers le haut =
+  attaquer), boutons d'action en bas à droite. En possession du ballon la
+  direction du joystick oriente aussi les passes et la visée du tir.
 - Bouton 📷 : capture d'écran. Bouton ✕ : retour au menu.
 
 ## Architecture
@@ -55,7 +62,8 @@ assets/vendor/        three.module.js embarqué (r160)
 src/
   main.js             Bootstrap, navigation, boucle de jeu
   config.js           Constantes physiques + réglages de difficulté
-  world.js            Scène 3D : stade, cage, foule, figurines voxel, ballon
+  world.js            Scène 3D : stade complet (tribunes, toit, projecteurs),
+                      terrain entier à deux cages, figurines voxel, ballon
   shot.js             Physique du ballon (gravité + Magnus) et résolution d'un tir
   keeper.js           IA + animation du gardien
   input.js            Analyse du swipe tactile (direction / puissance / effet)
@@ -66,6 +74,7 @@ src/
     freekick.js       Mode Coup Franc
     penalty.js        Mode Penalty (séance de tirs au but)
     match.js          Mode Match (90' accélérées)
+    arcade.js         Mode Match Arcade (vue FIFA : joystick, passes, tacles)
 ```
 
 Les personnages sont des assemblages de cubes construits par

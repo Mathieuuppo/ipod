@@ -64,6 +64,15 @@
     <button id="btn-quitter" class="cache" aria-label="Quitter">✕</button>
     <button id="btn-photo" class="cache" aria-label="Capture d'écran">📷</button>
 
+    <!-- Contrôles du mode arcade : joystick virtuel + actions -->
+    <div id="controles-arcade" class="cache">
+      <div id="joystick"><div id="joystick-tete"></div></div>
+      <div id="boutons-arcade">
+        <button id="btn-action-passe">PASSE</button>
+        <button id="btn-action-tir">TIR</button>
+      </div>
+    </div>
+
     <!-- Conteneur des confettis -->
     <div id="confettis"></div>
 
@@ -83,6 +92,7 @@
       <button class="btn-mode" data-mode="freekick">🎯 Coup Franc<small id="etoiles-freekick"></small></button>
       <button class="btn-mode" data-mode="penalty">🥅 Penalty<small id="etoiles-penalty"></small></button>
       <button class="btn-mode" data-mode="match">🏆 Match<small id="etoiles-match"></small></button>
+      <button class="btn-mode" data-mode="arcade">🎮 Match Arcade<small id="etoiles-arcade"></small></button>
       <button class="btn-retour" id="btn-retour-titre">← Retour</button>
     </div>
 

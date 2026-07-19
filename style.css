@@ -236,6 +236,54 @@ html, body {
   border-radius: 3px;
 }
 
+/* ---------------- Contrôles du mode arcade ---------------- */
+#controles-arcade { position: absolute; inset: 0; pointer-events: none; }
+
+#joystick {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 26px);
+  left: 22px;
+  width: 128px; height: 128px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  pointer-events: auto;
+  touch-action: none;
+}
+#joystick-tete {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 56px; height: 56px;
+  margin: -28px 0 0 -28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  border: 2px solid #fff;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+}
+
+#boutons-arcade {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 26px);
+  right: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  pointer-events: auto;
+}
+#boutons-arcade button {
+  width: 82px; height: 82px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 900;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+  touch-action: none;
+}
+#btn-action-passe { background: rgba(34, 85, 204, 0.85); }
+#btn-action-tir { background: rgba(227, 48, 48, 0.85); box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
+#boutons-arcade button:active { transform: scale(0.92); }
+
 /* ---------------- Confettis ---------------- */
 #confettis { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .confetti {

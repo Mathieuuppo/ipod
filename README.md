@@ -31,9 +31,11 @@ dans `assets/vendor/`.
   (coup franc, penalty ou mini-jeu de timing) pendant que l'IA marque
   selon la difficulté.
 - **🎮 Match Arcade** — un vrai match jouable vu d'en haut (façon FIFA
-  rétro) : joystick virtuel pour courir et dribbler, boutons PASSE / TIR
-  en attaque, JOUEUR / TACLE en défense. 5 joueurs + gardien par équipe,
-  IA de position pour les coéquipiers et les adversaires.
+  rétro) en 11 contre 11 (4-4-2 + gardien) : joystick virtuel pour courir
+  et dribbler, boutons PASSE / TIR en attaque, JOUEUR / TACLE en défense.
+  Les passes sont téléguidées : le receveur est désigné, vient au-devant
+  du ballon et le contrôle directement. Pressing à deux, relances des
+  gardiens ciblées, changement automatique de joueur à la perte du ballon.
 
 Trois difficultés (facile / moyen / difficile) qui règlent la lecture du
 tir par le gardien, sa vitesse de réaction et le timing du mur.

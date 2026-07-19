@@ -16,10 +16,10 @@
 import * as THREE from 'three';
 import { CONFIG, alea, clamp } from './config.js';
 
-// Dimensions du terrain complet (mode arcade)
+// Dimensions du terrain complet (mode arcade, 11 contre 11)
 export const TERRAIN = {
-  demiLargeur: 20,   // x ∈ [-20, 20]
-  longueur: 50,      // z ∈ [0, 50]
+  demiLargeur: 24,   // x ∈ [-24, 24]
+  longueur: 62,      // z ∈ [0, 62]
 };
 
 // ---------- Petites textures générées (aucun asset externe) ----------
@@ -227,15 +227,15 @@ export class Monde {
     ligne(0.12, L, -D, L / 2);
     // Ligne médiane + rond central
     ligne(D * 2, 0.12, 0, L / 2);
-    const rond = new THREE.Mesh(new THREE.RingGeometry(5.4, 5.55, 48), matLigne);
+    const rond = new THREE.Mesh(new THREE.RingGeometry(6, 6.15, 48), matLigne);
     rond.rotation.x = -Math.PI / 2;
     rond.position.set(0, 0.01, L / 2);
     this.scene.add(rond);
     // Surfaces de réparation des deux côtés
     for (const [zBase, sens] of [[0, 1], [L, -1]]) {
-      ligne(0.12, 12, 10, zBase + sens * 6);
-      ligne(0.12, 12, -10, zBase + sens * 6);
-      ligne(20, 0.12, 0, zBase + sens * 12);
+      ligne(0.12, 13, 11, zBase + sens * 6.5);
+      ligne(0.12, 13, -11, zBase + sens * 6.5);
+      ligne(22, 0.12, 0, zBase + sens * 13);
     }
   }
 
@@ -292,7 +292,7 @@ export class Monde {
   }
 
   construireTribunes() {
-    const L = TERRAIN.longueur;
+    const L = TERRAIN.longueur, D = TERRAIN.demiLargeur;
     const matGradin = new THREE.MeshLambertMaterial({ color: 0x8a8f99 });
     const matToit = new THREE.MeshLambertMaterial({ color: 0xe8e8ee });
     const positionsFoule = [];
@@ -311,7 +311,7 @@ export class Monde {
         );
         const recul = etage * profondeur;
         const y = hauteur / 2 + etage * hauteur;
-        if (axe === 'z') g.position.set(centre, y, coord + Math.sign(coord - 25) * recul);
+        if (axe === 'z') g.position.set(centre, y, coord + Math.sign(coord - L / 2) * recul);
         else g.position.set(coord + Math.sign(coord) * recul, y, centre);
         this.scene.add(g);
 
@@ -321,7 +321,7 @@ export class Monde {
           const le = -longueur / 2 + 0.3 + i * 0.55 + alea(-0.15, 0.15);
           const pr = alea(-2.4, 2.4);
           if (axe === 'z') {
-            positionsFoule.push([centre + le, y + hauteur / 2 + 0.3, coord + Math.sign(coord - 25) * recul + pr]);
+            positionsFoule.push([centre + le, y + hauteur / 2 + 0.3, coord + Math.sign(coord - L / 2) * recul + pr]);
           } else {
             positionsFoule.push([coord + Math.sign(coord) * recul + pr, y + hauteur / 2 + 0.3, centre + le]);
           }
@@ -332,15 +332,15 @@ export class Monde {
         axe === 'z' ? new THREE.BoxGeometry(longueur + 4, 0.7, 8) : new THREE.BoxGeometry(8, 0.7, longueur + 4),
         matToit
       );
-      if (axe === 'z') toit.position.set(centre, 11.5, coord + Math.sign(coord - 25) * 13);
+      if (axe === 'z') toit.position.set(centre, 11.5, coord + Math.sign(coord - L / 2) * 13);
       else toit.position.set(coord + Math.sign(coord) * 13, 11.5, centre);
       this.scene.add(toit);
     };
 
-    tribune('z', -9, 0, 64);        // derrière la cage A
-    tribune('z', L + 9, 0, 64);     // derrière la cage B
-    tribune('x', 27, L / 2, 74);    // tribune latérale droite
-    tribune('x', -27, L / 2, 74);   // tribune latérale gauche
+    tribune('z', -9, 0, D * 2 + 24);          // derrière la cage A
+    tribune('z', L + 9, 0, D * 2 + 24);       // derrière la cage B
+    tribune('x', D + 7, L / 2, L + 26);       // tribune latérale droite
+    tribune('x', -(D + 7), L / 2, L + 26);    // tribune latérale gauche
 
     // Foule : cubes colorés instanciés aux couleurs des deux équipes
     const couleurs = [0x2255cc, 0xcc3333, 0xffffff, 0xf0d040, 0x333366, 0x993333, 0x77aadd];
@@ -359,7 +359,7 @@ export class Monde {
     // Projecteurs aux quatre coins du stade
     const matPylone = new THREE.MeshLambertMaterial({ color: 0x666a72 });
     const matLampe = new THREE.MeshBasicMaterial({ color: 0xfff8dd });
-    for (const [x, z] of [[-30, -14], [30, -14], [-30, L + 14], [30, L + 14]]) {
+    for (const [x, z] of [[-(D + 10), -14], [D + 10, -14], [-(D + 10), L + 14], [D + 10, L + 14]]) {
       const pylone = new THREE.Mesh(new THREE.BoxGeometry(0.8, 20, 0.8), matPylone);
       pylone.position.set(x, 10, z);
       this.scene.add(pylone);
@@ -377,10 +377,10 @@ export class Monde {
       p.rotation.y = rot;
       this.scene.add(p);
     };
-    pub(44, 0, -4.2, 0);
-    pub(44, 0, L + 4.2, 0);
-    pub(L + 6, 24, L / 2, Math.PI / 2);
-    pub(L + 6, -24, L / 2, Math.PI / 2);
+    pub(D * 2 + 8, 0, -4.2, 0);
+    pub(D * 2 + 8, 0, L + 4.2, 0);
+    pub(L + 6, D + 4, L / 2, Math.PI / 2);
+    pub(L + 6, -(D + 4), L / 2, Math.PI / 2);
   }
 
   construireActeurs() {
@@ -487,12 +487,13 @@ export class Monde {
 
   // Caméra "FIFA vue de haut" : au-dessus du ballon, inclinée vers
   // l'avant, avec un lissage pour suivre l'action sans à-coups.
+  // Un peu plus haute pour lire le jeu à 11 contre 11.
   suivreCameraArcade(cibleX, cibleZ, dt) {
-    const zVue = clamp(cibleZ, 6, TERRAIN.longueur - 6);
-    const posVoulue = new THREE.Vector3(cibleX * 0.45, 24, zVue + 12);
+    const zVue = clamp(cibleZ, 7, TERRAIN.longueur - 7);
+    const posVoulue = new THREE.Vector3(cibleX * 0.45, 28, zVue + 14);
     const k = Math.min(dt * 4, 1);
     this.camera.position.lerp(posVoulue, k);
-    this.cibleCamera = new THREE.Vector3(cibleX * 0.6, 0, zVue - 2);
+    this.cibleCamera = new THREE.Vector3(cibleX * 0.6, 0, zVue - 3);
     this.camera.lookAt(this.cibleCamera);
   }
 

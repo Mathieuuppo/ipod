@@ -3,11 +3,14 @@
 // FIFA rétro). Joystick virtuel pour courir, boutons PASSE / TIR
 // (qui deviennent JOUEUR / TACLE quand on défend).
 //
+// 11 contre 11 : 10 joueurs de champ en 4-4-2 + gardien par équipe.
 // L'équipe BLEUE (le joueur) attaque la cage A (z = 0), l'équipe
-// ROUGE attaque la cage B (z = 50). Chaque équipe : 5 joueurs de
-// champ pilotés par une IA de position simple + 1 gardien.
-// Le ballon est soit porté (dribble), soit libre (physique 2D+
-// hauteur pour les tirs).
+// ROUGE attaque la cage B (z = L).
+//
+// Les passes sont "téléguidées" : le receveur est désigné au moment
+// de la passe, court au-devant du ballon et bénéficie d'une grande
+// zone de contrôle — une passe part et ARRIVE, comme dans un jeu
+// d'arcade, sans balle perdue en route.
 // ============================================================
 
 import { CONFIG, DIFFICULTES, clamp, alea } from '../config.js';
@@ -15,18 +18,19 @@ import { TERRAIN } from '../world.js';
 import { sauvegarde } from '../storage.js';
 import { sons } from '../audio.js';
 
-const L = TERRAIN.longueur;       // 50
-const DEMI = TERRAIN.demiLargeur; // 20
+const L = TERRAIN.longueur;
+const DEMI = TERRAIN.demiLargeur;
 const BUT_X = CONFIG.butDemiLargeur;
 const BUT_Y = CONFIG.butHauteur;
 
-// Ancrages de formation (x, décalage z par rapport au ballon, vers son
-// propre but) : 2 défenseurs, 2 milieux, 1 attaquant.
+// Formation 4-4-2 : ancrages (x, décalage z par rapport au ballon,
+// positif = vers son propre but).
 const FORMATION = [
-  { x: -7, zOff: 14 }, { x: 7, zOff: 14 },   // défenseurs
-  { x: -9, zOff: 2 }, { x: 9, zOff: 2 },     // milieux
-  { x: 0, zOff: -11 },                       // attaquant
+  { x: -15, zOff: 16 }, { x: -5, zOff: 17 }, { x: 5, zOff: 17 }, { x: 15, zOff: 16 }, // défense
+  { x: -16, zOff: 3 }, { x: -5.5, zOff: 4 }, { x: 5.5, zOff: 4 }, { x: 16, zOff: 3 }, // milieu
+  { x: -7, zOff: -13 }, { x: 7, zOff: -13 },                                          // attaque
 ];
+const INDICE_ATTAQUANT = 8; // premier attaquant (pour l'engagement)
 
 // Un joueur de champ (mesh voxel + état de déplacement)
 class Joueur {
@@ -93,13 +97,14 @@ export class ModeArcade {
     // Équipes
     this.bleus = acteurs.bleu.map((m, i) => new Joueur(m, 'bleu', i));
     this.rouges = acteurs.rouge.map((m, i) => new Joueur(m, 'rouge', i));
-    // Gardiens : le rouge défend la cage A (z=0), le bleu la cage B (z=50)
+    // Gardiens : le rouge défend la cage A (z=0), le bleu la cage B (z=L)
     this.gardienA = new Joueur(acteurs.gardienRouge, 'rouge', -1);
     this.gardienB = new Joueur(acteurs.gardienBleu, 'bleu', -1);
 
     // Ballon : position 3D + vitesse ; porteur = dribble en cours
     this.ballon = { x: 0, y: CONFIG.rayonBallon, z: L / 2, vx: 0, vy: 0, vz: 0 };
     this.porteur = null;
+    this.receveur = null;     // destinataire désigné de la passe en cours
     this.ignoreReprise = { joueur: null, temps: 0 }; // anti double-touche après un coup de pied
 
     this.scoreJoueur = 0;
@@ -128,17 +133,38 @@ export class ModeArcade {
   engagement(equipe) {
     for (let i = 0; i < this.bleus.length; i++) {
       const f = FORMATION[i];
-      this.bleus[i].placer(f.x, clamp(L / 2 + f.zOff * 0.9, 3, L - 3));
-      this.rouges[i].placer(-f.x, clamp(L / 2 - f.zOff * 0.9, 3, L - 3));
+      this.bleus[i].placer(f.x, clamp(L / 2 + f.zOff * 1.1, 3, L - 3));
+      this.rouges[i].placer(-f.x, clamp(L / 2 - f.zOff * 1.1, 3, L - 3));
     }
     this.gardienA.placer(0, 1.0);
     this.gardienB.placer(0, L - 1.0);
     Object.assign(this.ballon, { x: 0, y: CONFIG.rayonBallon, z: L / 2, vx: 0, vy: 0, vz: 0 });
+    this.receveur = null;
     // L'équipe qui engage reçoit le ballon au centre
-    const receveur = equipe === 'bleu' ? this.bleus[4] : this.rouges[4];
+    const receveur = equipe === 'bleu' ? this.bleus[INDICE_ATTAQUANT] : this.rouges[INDICE_ATTAQUANT];
     receveur.placer(0, L / 2 + (equipe === 'bleu' ? 1.2 : -1.2));
     this.porteur = receveur;
     this.controle = equipe === 'bleu' ? receveur : this.plusProcheBleu();
+  }
+
+  // ---------- Passes téléguidées ----------
+
+  // Frappe une passe tendue vers un coéquipier : vitesse proportionnelle
+  // à la distance (elle arrive vite même de loin), trajectoire à ras de
+  // terre, et receveur désigné qui vient au-devant du ballon.
+  passe(porteur, receveur) {
+    // Point de rencontre : on anticipe la course du receveur
+    const cx = receveur.x + receveur.vx * 0.3;
+    const cz = receveur.z + receveur.vz * 0.3;
+    const dx = cx - porteur.x, dz = cz - porteur.z;
+    const d = Math.hypot(dx, dz) || 1;
+    const vitesse = CONFIG.arcadeVitessePasseMin + d * CONFIG.arcadeVitessePasseParMetre;
+    this.ballon.vx = dx / d * vitesse;
+    this.ballon.vz = dz / d * vitesse;
+    this.ballon.vy = 0; // passe à ras de terre : contrôle immédiat
+    this.porteur = null;
+    this.receveur = receveur;
+    this.ignoreReprise = { joueur: porteur, temps: 0.4 };
   }
 
   // ---------- Actions du joueur ----------
@@ -158,14 +184,11 @@ export class ModeArcade {
         const dx = c.x - p.x, dz = c.z - p.z;
         const d = Math.hypot(dx, dz) || 1;
         const alignement = (dx * dirX + dz * dirZ) / d;
-        const score = alignement * 10 - d * 0.18;
+        const score = alignement * 10 - d * 0.15;
         if (score > meilleurScore) { meilleurScore = score; meilleur = c; }
       }
       if (!meilleur) return;
-      // Passe avec un peu d'avance sur la course du receveur
-      const cx = meilleur.x + meilleur.vx * 0.25;
-      const cz = meilleur.z + meilleur.vz * 0.25;
-      this.frapper(p, cx - p.x, cz - p.z, CONFIG.arcadeVitessePasse, 0.6);
+      this.passe(p, meilleur);
       this.controle = meilleur; // on prend la main sur le receveur
       sons.clic();
     } else {
@@ -198,13 +221,14 @@ export class ModeArcade {
     }
   }
 
-  // Le porteur frappe le ballon dans une direction (passe ou tir)
+  // Le porteur frappe le ballon dans une direction (tir, dégagement)
   frapper(joueur, dx, dz, vitesse, vy) {
     const d = Math.hypot(dx, dz) || 1;
     this.ballon.vx = dx / d * vitesse;
     this.ballon.vz = dz / d * vitesse;
     this.ballon.vy = vy;
     this.porteur = null;
+    this.receveur = null;
     this.ignoreReprise = { joueur, temps: 0.45 };
   }
 
@@ -214,6 +238,7 @@ export class ModeArcade {
     this.ballon.vz = alea(-force, force);
     this.ballon.vy = 1.2;
     this.porteur = null;
+    this.receveur = null;
     this.ignoreReprise = { joueur: ancienPorteur, temps: 0.5 };
   }
 
@@ -277,6 +302,13 @@ export class ModeArcade {
   majJoueurControle(dt) {
     const j = this.ctx.ui.joystick;
     const c = this.controle;
+    // Si le joueur contrôlé est le receveur d'une passe, il court
+    // automatiquement au-devant du ballon (sauf si on pilote au joystick)
+    if (this.receveur === c && !j.actif) {
+      c.chercher(this.ballon.x + this.ballon.vx * 0.15, this.ballon.z + this.ballon.vz * 0.15,
+        CONFIG.arcadeVitesseJoueur, dt);
+      return;
+    }
     if (j.actif && (Math.abs(j.x) > 0.12 || Math.abs(j.y) > 0.12)) {
       c.vx = j.x * CONFIG.arcadeVitesseJoueur;
       c.vz = j.y * CONFIG.arcadeVitesseJoueur;
@@ -286,46 +318,80 @@ export class ModeArcade {
     c.avancer(dt);
   }
 
-  // Coéquipiers bleus : tenue de poste + le plus proche va au ballon libre
+  // Coéquipiers bleus : tenue de poste 4-4-2, receveur au-devant de la
+  // passe, chasseur sur ballon libre, soutien défensif sur le porteur rouge
   majIABleue(dt) {
+    const porteurRouge = this.porteur && this.porteur.equipe === 'rouge' ? this.porteur : null;
     const chasseur = this.porteur ? null : this.plusProcheBleu();
+    // Soutien défensif : le bleu (non contrôlé) le plus proche du porteur rouge
+    let soutien = null;
+    if (porteurRouge) {
+      let dMin = 1e9;
+      for (const b of this.bleus) {
+        if (b === this.controle) continue;
+        const d = b.dist(porteurRouge.x, porteurRouge.z);
+        if (d < dMin) { dMin = d; soutien = b; }
+      }
+    }
+
     for (const b of this.bleus) {
       if (b === this.controle) continue;
+      if (b === this.receveur) {
+        // Le receveur désigné va au-devant du ballon
+        b.chercher(this.ballon.x + this.ballon.vx * 0.15, this.ballon.z + this.ballon.vz * 0.15,
+          CONFIG.arcadeVitesseJoueur, dt);
+        continue;
+      }
       if (b === chasseur) {
         b.chercher(this.ballon.x, this.ballon.z, CONFIG.arcadeVitesseJoueur * 0.9, dt);
         continue;
       }
+      if (b === soutien) {
+        b.chercher(porteurRouge.x, porteurRouge.z, CONFIG.arcadeVitesseJoueur * 0.85, dt);
+        continue;
+      }
       const f = FORMATION[b.indice];
       // Les bleus défendent la cage B (z = L) : les ancres suivent le ballon
-      const tz = clamp(this.ballon.z + f.zOff * 0.75, 2.5, L - 2.5);
-      const tx = clamp(f.x + this.ballon.x * 0.25, -DEMI + 1, DEMI - 1);
+      const tz = clamp(this.ballon.z + f.zOff * 0.7, 2.5, L - 2.5);
+      const tx = clamp(f.x + this.ballon.x * 0.2, -DEMI + 1, DEMI - 1);
       b.chercher(tx, tz, CONFIG.arcadeVitesseJoueur * 0.75, dt);
     }
   }
 
-  // Adversaires rouges : pressing, passes et tirs selon la difficulté
+  // Adversaires rouges : pressing à deux, passes et tirs selon la difficulté
   majIARouge(dt) {
     const r = this.reglages;
     const porteurRouge = this.porteur && this.porteur.equipe === 'rouge' ? this.porteur : null;
     const porteurBleu = this.porteur && this.porteur.equipe === 'bleu' ? this.porteur : null;
 
-    // Poursuite : le rouge le plus proche du ballon presse toujours
-    let chasseur = null, dMin = 1e9;
+    // Les deux rouges les plus proches du ballon pressent
+    let chasseur = null, second = null, d1 = 1e9, d2 = 1e9;
     for (const rj of this.rouges) {
       const d = rj.dist(this.ballon.x, this.ballon.z);
-      if (d < dMin) { dMin = d; chasseur = rj; }
+      if (d < d1) { d2 = d1; second = chasseur; d1 = d; chasseur = rj; }
+      else if (d < d2) { d2 = d; second = rj; }
     }
 
     for (const rj of this.rouges) {
       if (rj === porteurRouge) continue; // le porteur est géré plus bas
-      if (rj === chasseur && !porteurRouge) {
+      if (rj === this.receveur) {
+        // Receveur d'une passe rouge : au-devant du ballon
+        rj.chercher(this.ballon.x + this.ballon.vx * 0.15, this.ballon.z + this.ballon.vz * 0.15,
+          r.arcadeVitesseIA, dt);
+        continue;
+      }
+      if (!porteurRouge && rj === chasseur) {
         rj.chercher(this.ballon.x, this.ballon.z, r.arcadeVitesseIA, dt);
+        continue;
+      }
+      if (!porteurRouge && rj === second) {
+        rj.chercher(this.ballon.x, this.ballon.z, r.arcadeVitesseIA * 0.8, dt);
         continue;
       }
       // Tenue de poste (les rouges défendent la cage A : ancres inversées)
       const f = FORMATION[rj.indice];
-      const tz = clamp(this.ballon.z - f.zOff * 0.75, 2.5, L - 2.5);
-      const tx = clamp(-f.x + this.ballon.x * 0.25, -DEMI + 1, DEMI - 1);
+      const tz = clamp(this.ballon.z - f.zOff * 0.7, 2.5, L - 2.5);
+      const tx = clamp(-f.x + this.ballon.x * 0.2, -DEMI + 1, DEMI - 1);
       rj.chercher(tx, tz, r.arcadeVitesseIA * 0.8, dt);
     }
 
@@ -355,7 +421,7 @@ export class ModeArcade {
           this.frapper(porteurRouge, viseX - porteurRouge.x, L - porteurRouge.z,
             CONFIG.arcadeVitesseTir * 0.95, clamp(distBut * 0.15, 1.2, 4));
           sons.frappe();
-        } else if (pression && Math.random() < 0.8) {
+        } else if (pression && Math.random() < 0.85) {
           // Passe au rouge le plus avancé et pas trop loin
           let meilleur = null, score = -1e9;
           for (const c of this.rouges) {
@@ -363,31 +429,35 @@ export class ModeArcade {
             const s = c.z * 0.5 - c.dist(porteurRouge.x, porteurRouge.z) * 0.25;
             if (s > score) { score = s; meilleur = c; }
           }
-          if (meilleur) {
-            this.frapper(porteurRouge, meilleur.x - porteurRouge.x, meilleur.z - porteurRouge.z,
-              CONFIG.arcadeVitessePasse, 0.6);
-          }
+          if (meilleur) this.passe(porteurRouge, meilleur);
         }
       }
     }
   }
 
   // Gardiens : suivent le ballon latéralement, captent les tirs proches
+  // puis relancent proprement sur un coéquipier au milieu de terrain
   majGardiens(dt) {
+    const relancer = (g) => {
+      const equipe = g === this.gardienA ? this.rouges : this.bleus;
+      // Relance vers le milieu le plus proche du rond central, côté ballon
+      let meilleur = equipe[4], score = -1e9;
+      for (const c of equipe) {
+        const s = -Math.abs(c.z - L / 2) - Math.abs(c.x - this.ballon.x) * 0.3;
+        if (s > score) { score = s; meilleur = c; }
+      }
+      this.passe(g, meilleur);
+      this.ballon.vy = 3; // relance légèrement aérienne
+      sons.arret();
+    };
     const suivre = (g, zLigne) => {
       const cible = clamp(this.ballon.x, -3.1, 3.1);
       g.chercher(cible, zLigne, 5.5, dt);
-      // Capte / détourne un ballon libre tout proche
       if (!this.porteur && this.ballon.y < 1.8 &&
-          Math.hypot(this.ballon.x - g.x, this.ballon.z - g.z) < 1.25 &&
+          Math.hypot(this.ballon.x - g.x, this.ballon.z - g.z) < 1.35 &&
           this.ignoreReprise.temps <= 0) {
-        // Dégagement vers le milieu de terrain
-        const sens = zLigne < L / 2 ? 1 : -1;
-        this.ballon.vx = alea(-6, 6);
-        this.ballon.vz = sens * alea(12, 16);
-        this.ballon.vy = 5;
+        relancer(g);
         this.ignoreReprise = { joueur: g, temps: 0.5 };
-        sons.arret();
       }
     };
     suivre(this.gardienA, 1.0);
@@ -406,7 +476,8 @@ export class ModeArcade {
       b.y = CONFIG.rayonBallon;
       b.vx = p.vx; b.vz = p.vz; b.vy = 0;
     } else {
-      // Ballon libre : gravité + frottement au sol + rebonds
+      // Ballon libre : gravité + frottement au sol + rebonds.
+      // Frottement réduit pour que les passes restent tendues.
       b.vy -= CONFIG.gravite * dt;
       b.x += b.vx * dt;
       b.z += b.vz * dt;
@@ -414,8 +485,8 @@ export class ModeArcade {
       if (b.y < CONFIG.rayonBallon) {
         b.y = CONFIG.rayonBallon;
         b.vy = Math.abs(b.vy) > 1.5 ? -b.vy * 0.45 : 0;
-        b.vx *= 1 - 1.4 * dt;
-        b.vz *= 1 - 1.4 * dt;
+        b.vx *= 1 - 0.9 * dt;
+        b.vz *= 1 - 0.9 * dt;
       }
 
       // Buts et sorties : cage A (z=0, but du joueur), cage B (z=L, but IA)
@@ -433,13 +504,14 @@ export class ModeArcade {
         b.vx = -b.vx * 0.5;
       }
 
-      // Prise de balle : premier joueur assez proche d'un ballon au sol
-      if (b.y < 0.6) {
+      // Prise de balle : le receveur désigné a une grande zone de
+      // contrôle (passe toujours donnée) ; les autres une zone normale
+      if (b.y < 0.7) {
         for (const j of [...this.bleus, ...this.rouges]) {
           if (this.ignoreReprise.temps > 0 && this.ignoreReprise.joueur === j) continue;
-          if (j.dist(b.x, b.z) < 0.6) {
-            this.porteur = j;
-            if (j.equipe === 'bleu') this.controle = j; // on récupère la main
+          const rayon = j === this.receveur ? 1.1 : 0.6;
+          if (j.dist(b.x, b.z) < rayon) {
+            this.prisePossession(j);
             break;
           }
         }
@@ -449,6 +521,17 @@ export class ModeArcade {
     mesh.position.set(b.x, b.y, b.z);
     mesh.rotation.x -= b.vz * dt * 4;
     mesh.rotation.z += b.vx * dt * 4;
+  }
+
+  prisePossession(j) {
+    this.porteur = j;
+    this.receveur = null;
+    if (j.equipe === 'bleu') {
+      this.controle = j;             // on récupère la main sur le porteur
+    } else {
+      // Perte de balle : bascule automatique sur le défenseur le plus proche
+      this.controle = this.plusProcheBleu();
+    }
   }
 
   but(equipe) {
@@ -469,6 +552,7 @@ export class ModeArcade {
     this.etat = 'pause';
     this.tempsPause = 1.8;
     this.porteur = null;
+    this.receveur = null;
     this.ballon.vx = this.ballon.vz = this.ballon.vy = 0;
   }
 

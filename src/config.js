@@ -44,11 +44,12 @@ export const CONFIG = {
   secondesParMinuteMatch: 1.4,
 
   // Mode arcade (vue FIFA) : rythme et équipes
-  arcadeJoueursParEquipe: 5,      // joueurs de champ par équipe (+ 1 gardien)
+  arcadeJoueursParEquipe: 10,     // joueurs de champ par équipe (+ 1 gardien = 11)
   arcadeSecondesParMinute: 2.0,   // 90' ≈ 3 minutes réelles
-  arcadeVitesseJoueur: 7.5,       // m/s du joueur contrôlé
-  arcadeVitessePasse: 15,
-  arcadeVitesseTir: 21,
+  arcadeVitesseJoueur: 7.8,       // m/s du joueur contrôlé
+  arcadeVitessePasseMin: 17,      // vitesse plancher d'une passe (m/s)
+  arcadeVitessePasseParMetre: 1.5,// la passe accélère avec la distance
+  arcadeVitesseTir: 22,
 };
 
 // Réglages par difficulté : plus c'est dur, plus le gardien lit le tir

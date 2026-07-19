@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <!-- Plein écran mobile : pas de zoom, pas de scroll, safe-areas couvertes -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#3fa9f5">
+  <title>Free Kick Champions</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚽</text></svg>">
+  <link rel="stylesheet" href="style.css">
+  <!-- Three.js est chargé en local (assets/vendor) pour fonctionner sans CDN -->
+  <script type="importmap">
+    { "imports": { "three": "./assets/vendor/three.module.js" } }
+  </script>
+</head>
+<body>
+  <!-- Canvas 3D (créé par Three.js, injecté ici) -->
+  <div id="conteneur-jeu"></div>
+
+  <!-- ===================== Surcouche UI (DOM) ===================== -->
+  <div id="ui">
+
+    <!-- Bandeau de match (drapeaux, minuteur, score) -->
+    <div id="hud-match" class="cache">
+      <div class="equipe">
+        <canvas class="drapeau" id="drapeau-joueur" width="42" height="28"></canvas>
+        <span id="nom-joueur">BLU</span>
+      </div>
+      <div id="cadre-central">
+        <div id="score-match">0 - 0</div>
+        <div id="minuteur">0'</div>
+      </div>
+      <div class="equipe">
+        <span id="nom-adverse">ROU</span>
+        <canvas class="drapeau" id="drapeau-adverse" width="42" height="28"></canvas>
+      </div>
+    </div>
+
+    <!-- Compteur de tirs (coup franc / penalty) -->
+    <div id="hud-tirs" class="cache"></div>
+
+    <!-- Texte d'instruction façon cartoon ("Glisse pour tirer !") -->
+    <div id="instruction" class="cache"></div>
+
+    <!-- Gros message de résultat (BUT ! / ARRÊT ! ...) -->
+    <div id="message-resultat" class="cache"></div>
+
+    <!-- Mini-jeu de timing (mode match) : barre oscillante -->
+    <div id="minijeu-timing" class="cache">
+      <div id="timing-titre">Tape dans la zone verte !</div>
+      <div id="timing-barre">
+        <div id="timing-zone"></div>
+        <div id="timing-curseur"></div>
+      </div>
+    </div>
+
+    <!-- Boutons persistants en jeu -->
+    <button id="btn-quitter" class="cache" aria-label="Quitter">✕</button>
+    <button id="btn-photo" class="cache" aria-label="Capture d'écran">📷</button>
+
+    <!-- Conteneur des confettis -->
+    <div id="confettis"></div>
+
+    <!-- ===================== Écran titre ===================== -->
+    <div id="ecran-titre" class="ecran">
+      <h1 id="logo">FREE KICK<br><span>CHAMPIONS</span></h1>
+      <div id="stats-titre">
+        <div>⚽ Buts marqués : <b id="stat-buts">0</b></div>
+        <div>🔥 Meilleure série : <b id="stat-serie">0</b></div>
+      </div>
+      <button class="btn-principal" id="btn-jouer">JOUER</button>
+    </div>
+
+    <!-- ===================== Choix du mode ===================== -->
+    <div id="ecran-modes" class="ecran cache">
+      <h2>Choisis un mode</h2>
+      <button class="btn-mode" data-mode="freekick">🎯 Coup Franc<small id="etoiles-freekick"></small></button>
+      <button class="btn-mode" data-mode="penalty">🥅 Penalty<small id="etoiles-penalty"></small></button>
+      <button class="btn-mode" data-mode="match">🏆 Match<small id="etoiles-match"></small></button>
+      <button class="btn-retour" id="btn-retour-titre">← Retour</button>
+    </div>
+
+    <!-- ===================== Choix de la difficulté ===================== -->
+    <div id="ecran-difficulte" class="ecran cache">
+      <h2>Difficulté</h2>
+      <button class="btn-mode" data-difficulte="facile">😀 Facile</button>
+      <button class="btn-mode" data-difficulte="moyen">😐 Moyen</button>
+      <button class="btn-mode" data-difficulte="difficile">😈 Difficile</button>
+      <button class="btn-retour" id="btn-retour-modes">← Retour</button>
+    </div>
+
+    <!-- ===================== Écran de résultat de session ===================== -->
+    <div id="ecran-resultat" class="ecran cache">
+      <h2 id="resultat-titre">Terminé !</h2>
+      <div id="resultat-detail"></div>
+      <div id="resultat-etoiles"></div>
+      <button class="btn-principal" id="btn-rejouer">REJOUER</button>
+      <button class="btn-retour" id="btn-resultat-menu">Menu principal</button>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

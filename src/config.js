@@ -46,7 +46,7 @@ export const CONFIG = {
   // Mode arcade (vue FIFA) : rythme et équipes
   arcadeJoueursParEquipe: 10,     // joueurs de champ par équipe (+ 1 gardien = 11)
   arcadeSecondesParMinute: 2.0,   // 90' ≈ 3 minutes réelles
-  arcadeVitesseJoueur: 7.8,       // m/s du joueur contrôlé
+  arcadeVitesseJoueur: 7.0,       // m/s du joueur contrôlé
   arcadeVitessePasseMin: 17,      // vitesse plancher d'une passe (m/s)
   arcadeVitessePasseParMetre: 1.5,// la passe accélère avec la distance
   arcadeVitesseTir: 22,
@@ -63,7 +63,7 @@ export const DIFFICULTES = {
     iaChanceButPenalty: 0.55,  // proba que l'IA marque son penalty
     iaChanceButMatch: 0.30,    // proba de but IA par occasion adverse (match)
     timingZone: 0.30,          // largeur relative de la zone verte du mini-jeu
-    arcadeVitesseIA: 5.2,      // vitesse de course des adversaires (m/s)
+    arcadeVitesseIA: 4.8,      // vitesse de course des adversaires (m/s)
     arcadePrecisionIA: 0.30,   // précision des tirs adverses (0..1)
     arcadeReactionIA: 0.9,     // agressivité défensive de l'IA (0..1)
   },
@@ -75,7 +75,7 @@ export const DIFFICULTES = {
     iaChanceButPenalty: 0.70,
     iaChanceButMatch: 0.45,
     timingZone: 0.20,
-    arcadeVitesseIA: 6.2,
+    arcadeVitesseIA: 5.6,
     arcadePrecisionIA: 0.45,
     arcadeReactionIA: 0.6,
   },
@@ -87,7 +87,7 @@ export const DIFFICULTES = {
     iaChanceButPenalty: 0.82,
     iaChanceButMatch: 0.60,
     timingZone: 0.13,
-    arcadeVitesseIA: 7.2,
+    arcadeVitesseIA: 6.5,
     arcadePrecisionIA: 0.62,
     arcadeReactionIA: 0.35,
   },

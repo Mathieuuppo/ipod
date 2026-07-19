@@ -115,19 +115,25 @@ export class ModeMatch {
       ui.montrerMessage(`${this.minute}' — PENALTY !`, 1600);
     }
     gardien.reinitialiser();
-    ui.montrerInstruction('Glisse vers le haut pour tirer !');
+    ui.montrerInstruction('Trace la trajectoire de ton tir !');
 
     swipe.actif = true;
-    swipe.surProgression = (apercu) => monde.majFleche(apercu);
-    swipe.surTir = (params) => {
+    swipe.surProgression = (points) => {
+      ui.dessinerTrace(points);
+      const dernier = points[points.length - 1];
+      monde.majFleche(monde.cibleDepuisEcran(dernier.x, dernier.y));
+    };
+    swipe.surTir = (geste) => {
       swipe.actif = false;
       ui.montrerInstruction(null);
+      ui.effacerTrace();
       monde.majFleche(null);
       monde.animerFrappe();
       sons.frappe();
+      const cible = monde.cibleDepuisEcran(geste.finX, geste.finY);
       this.sequence = new SequenceTir(monde, gardien, this.ctx.difficulte, avecMur);
       this.sequence.surEvenement = (type) => this.jouerSon(type);
-      this.sequence.lancer(params);
+      this.sequence.lancer({ cible, puissance: geste.puissance, spin: geste.spin });
     };
   }
 
@@ -143,6 +149,7 @@ export class ModeMatch {
     ui.demarrerTiming(DIFFICULTES[difficulte].timingZone);
 
     swipe.actif = true;
+    swipe.surProgression = null; // pas de tracé ici : c'est un jeu de timing
     const declencher = () => {
       swipe.actif = false;
       swipe.surTap = null;
@@ -155,15 +162,15 @@ export class ModeMatch {
       this.sequence = new SequenceTir(monde, gardien, difficulte, false);
       this.sequence.surEvenement = (type) => this.jouerSon(type);
       if (succes) {
-        // Frappe en lucarne, gardien envoyé du mauvais côté
+        // Frappe croisée près du poteau, gardien envoyé du mauvais côté
         this.sequence.lancer(
-          { puissance: 21, angleLateral: cote * 0.2, elevation: 0.2, spin: 0 },
+          { cible: { x: cote * 2.7, y: 1.7 }, puissance: 22, spin: 0 },
           { x: -cote * 2.4, y: 1 }
         );
       } else {
         // Frappe dévissée au-dessus de la barre
         this.sequence.lancer(
-          { puissance: 24, angleLateral: cote * 0.12, elevation: 0.5, spin: 0 }
+          { cible: { x: cote * 1.4, y: 4.2 }, puissance: 25, spin: 0 }
         );
       }
     };
@@ -224,6 +231,7 @@ export class ModeMatch {
     ui.annulerTiming();
     ui.montrerHudMatch(false);
     ui.montrerInstruction(null);
+    ui.effacerTrace();
     monde.majFleche(null);
   }
 }

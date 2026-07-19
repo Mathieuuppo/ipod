@@ -31,17 +31,41 @@ export class SequenceTir {
     this.surEvenement = null;  // callback(type) pour les sons immédiats
   }
 
-  // Convertit les paramètres du swipe en vitesse initiale puis lance le vol.
+  // Tir "Score Hero" : le joueur a tracé une trajectoire, on calcule la
+  // vitesse initiale pour que le ballon atteigne la cible (point d'arrivée
+  // du tracé dans le plan de la cage) en suivant la courbe dessinée.
+  //  - cible : { x, y } dans le plan z = 0
+  //  - puissance : vitesse du ballon (m/s) → règle aussi la tension du tir
+  //  - spin : effet ; la visée est compensée pour que la courbe RAMÈNE le
+  //    ballon sur la cible (le tir enroulé contourne le mur)
   // cibleGardien (optionnel) force le point que le gardien croit devoir
   // couvrir — utilisé par le mini-jeu de timing du mode match.
-  lancer({ puissance, angleLateral, elevation, spin }, cibleGardien = null) {
-    const cosE = Math.cos(elevation);
-    this.vel.set(
-      puissance * Math.sin(angleLateral) * cosE,
-      puissance * Math.sin(elevation),
-      -puissance * Math.cos(angleLateral) * cosE
-    );
+  lancer({ cible, puissance, spin }, cibleGardien = null) {
+    const g = CONFIG.gravite;
+    const x0 = this.pos.x, y0 = this.pos.y, D = this.pos.z; // distance au but
+    const dy = cible.y - y0;
+
+    // Angle d'élévation pour passer par la cible à la vitesse demandée :
+    // tan θ = (s² − √(s⁴ − g(gD² + 2·dy·s²))) / (gD)  (racine basse = tir tendu).
+    // Si la puissance ne suffit pas à atteindre la cible, on l'augmente.
+    let s = puissance, tan = null;
+    for (let i = 0; i < 24; i++) {
+      const disc = s * s * s * s - g * (g * D * D + 2 * dy * s * s);
+      if (disc >= 0) { tan = (s * s - Math.sqrt(disc)) / (g * D); break; }
+      s *= 1.1;
+    }
+    if (tan === null) tan = 1;
+    const theta = Math.atan(tan);
+    const sH = s * Math.cos(theta);   // vitesse horizontale (vers le but)
+    const T = D / sH;                 // temps de vol jusqu'à la ligne
+
+    // Effet Magnus latéral ≈ accélération constante a = c·spin·vz.
+    // On vise "à côté" de la cible pour que la courbe y ramène le ballon.
     this.spin = spin;
+    const a = CONFIG.coeffMagnus * spin * -sH;
+    const vx = (cible.x - x0 - 0.5 * a * T * T) / T;
+
+    this.vel.set(vx, s * Math.sin(theta), -sH);
     this.enVol = true;
     this.tempsVol = 0;
 
@@ -98,8 +122,9 @@ export class SequenceTir {
     for (let s = 0; s < sousPas; s++) {
       const prev = this.pos.clone();
       this.appliquerForces(this.vel, h);
-      // Léger amortissement du spin en vol
-      this.spin *= 1 - 0.25 * h;
+      // Très léger amortissement du spin (faible pour que le ballon
+      // termine bien sur la trajectoire tracée par le joueur)
+      this.spin *= 1 - 0.08 * h;
       this.pos.addScaledVector(this.vel, h);
 
       this.collisionSol();

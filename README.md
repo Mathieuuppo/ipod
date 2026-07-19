@@ -34,12 +34,14 @@ dans `assets/vendor/`.
 Trois difficultés (facile / moyen / difficile) qui règlent la lecture du
 tir par le gardien, sa vitesse de réaction et le timing du mur.
 
-## Contrôles
+## Contrôles (tir façon Score Hero)
 
-- **Glisser vers le haut** sur l'écran pour tirer :
-  - la **vitesse** du geste donne la puissance ;
-  - l'**angle** du geste donne la direction ;
-  - la **courbure** du tracé (doigt qui dévie) donne l'effet (courbe Magnus).
+- **Trace la trajectoire du tir avec le doigt** : une ligne pointillée
+  s'affiche pendant le geste.
+  - Le **point d'arrivée** du tracé est la cible visée (le ballon y termine) ;
+  - la **longueur** du tracé donne la puissance ;
+  - la **courbure** de la ligne donne l'effet : une ligne bombée fait un tir
+    enroulé qui contourne le mur avant de revenir sur la cible.
 - Mini-jeu de timing (mode match) : taper quand le curseur est dans la
   zone verte.
 - Bouton 📷 : capture d'écran. Bouton ✕ : retour au menu.

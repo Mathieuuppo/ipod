@@ -26,6 +26,77 @@ export class UI {
     this.minuteurTexte = null;
 
     this.dessinerDrapeaux();
+    this.initTrace();
+  }
+
+  // ---------- Ligne de trajectoire (tir façon Score Hero) ----------
+
+  initTrace() {
+    this.canvasTrace = $('canvas-trace');
+    this.ctxTrace = this.canvasTrace.getContext('2d');
+    const redimensionner = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      this.canvasTrace.width = window.innerWidth * dpr;
+      this.canvasTrace.height = window.innerHeight * dpr;
+      this.ctxTrace.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    redimensionner();
+    window.addEventListener('resize', redimensionner);
+  }
+
+  // Dessine le tracé du doigt : ligne jaune lissée + pointillés blancs,
+  // avec une pointe de flèche au bout (la cible du tir).
+  dessinerTrace(points) {
+    const ctx = this.ctxTrace;
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    if (!points || points.length < 2) return;
+
+    // Ligne continue légèrement transparente
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (const p of points) ctx.lineTo(p.x, p.y);
+    ctx.strokeStyle = 'rgba(255, 224, 0, 0.45)';
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // Pointillés blancs régulièrement espacés le long du tracé
+    ctx.fillStyle = '#ffffff';
+    let distDepuisPoint = 0;
+    for (let i = 1; i < points.length; i++) {
+      const seg = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+      distDepuisPoint += seg;
+      if (distDepuisPoint >= 16) {
+        distDepuisPoint = 0;
+        ctx.beginPath();
+        ctx.arc(points[i].x, points[i].y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Pointe de flèche orientée selon la fin du tracé
+    const fin = points[points.length - 1];
+    const avant = points[Math.max(0, points.length - 4)];
+    const angle = Math.atan2(fin.y - avant.y, fin.x - avant.x);
+    ctx.save();
+    ctx.translate(fin.x, fin.y);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(14, 0);
+    ctx.lineTo(-6, -9);
+    ctx.lineTo(-6, 9);
+    ctx.closePath();
+    ctx.fillStyle = '#ffe000';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  effacerTrace() {
+    this.ctxTrace.clearRect(0, 0, window.innerWidth, window.innerHeight);
   }
 
   // ---------- Navigation entre écrans ----------

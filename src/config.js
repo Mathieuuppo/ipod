@@ -19,13 +19,12 @@ export const CONFIG = {
   rebondSol: 0.45,        // restitution verticale au sol
   frottementSol: 0.8,     // perte horizontale à chaque rebond
 
-  // Tir : bornes de conversion du swipe
-  vitesseMin: 13,
-  vitesseMax: 27,
-  elevationMinDeg: 4,
-  elevationMaxDeg: 34,
-  angleLateralMaxDeg: 22,
-  spinMax: 9,
+  // Tir tracé (façon Score Hero) : bornes de conversion du geste
+  vitesseMin: 14,         // m/s pour un tracé court
+  vitesseMax: 27,         // m/s pour un tracé long et vif
+  spinMax: 9,             // effet max (courbure du tracé au maximum)
+  cibleXMax: 7,           // la cible visée est bornée autour de la cage
+  cibleYMax: 4.5,
 
   // Mur
   murHauteurJoueur: 1.82,

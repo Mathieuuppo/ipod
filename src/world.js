@@ -13,7 +13,7 @@
 // ============================================================
 
 import * as THREE from 'three';
-import { CONFIG, alea } from './config.js';
+import { CONFIG, alea, clamp } from './config.js';
 
 // ---------- Petites textures générées (aucun asset externe) ----------
 
@@ -403,15 +403,37 @@ export class Monde {
     u.jambeD.rotation.x = 0;
   }
 
+  // Convertit un point de l'écran (pixels) en cible dans le plan de la
+  // cage (z = 0) par lancer de rayon depuis la caméra. C'est le cœur du
+  // tir "Score Hero" : le doigt désigne directement un point du but.
+  cibleDepuisEcran(xEcran, yEcran) {
+    const ndc = new THREE.Vector2(
+      (xEcran / window.innerWidth) * 2 - 1,
+      -(yEcran / window.innerHeight) * 2 + 1
+    );
+    const rayon = new THREE.Raycaster();
+    rayon.setFromCamera(ndc, this.camera);
+    const o = rayon.ray.origin, d = rayon.ray.direction;
+    if (d.z >= -0.02) {
+      // Le doigt pointe le ciel : tir haut, non cadré, dans la même direction
+      return { x: clamp(o.x + d.x * 30, -CONFIG.cibleXMax, CONFIG.cibleXMax), y: CONFIG.cibleYMax + 1 };
+    }
+    const t = -o.z / d.z; // intersection avec le plan z = 0
+    return {
+      x: clamp(o.x + d.x * t, -CONFIG.cibleXMax, CONFIG.cibleXMax),
+      y: clamp(o.y + d.y * t, 0.15, CONFIG.cibleYMax),
+    };
+  }
+
   // ---------- Animations ----------
 
-  // Flèche de visée : orientée selon l'angle, longueur selon la puissance
-  majFleche(apercu) {
-    if (!apercu) { this.fleche.visible = false; return; }
+  // Flèche de visée au sol : pointée du ballon vers la cible visée
+  majFleche(cible) {
+    if (!cible) { this.fleche.visible = false; return; }
     this.fleche.visible = true;
-    this.fleche.rotation.y = -apercu.angleLateral;
-    const echelle = 0.7 + apercu.vitesseNorm * 1.1;
-    this.fleche.scale.set(1, 1, echelle);
+    const b = this.positionBallon;
+    this.fleche.rotation.y = -Math.atan2(cible.x - b.x, b.z);
+    this.fleche.scale.set(1, 1, 1.2);
   }
 
   // Animation de frappe du tireur : élan + balancé de jambe

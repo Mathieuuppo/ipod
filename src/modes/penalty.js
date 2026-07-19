@@ -46,20 +46,26 @@ export class ModePenalty {
     this.sequence = null;
 
     ui.montrerHudTirs(this.tableau());
-    ui.montrerInstruction('Penalty ! Glisse pour tirer !');
+    ui.montrerInstruction('Penalty ! Trace ta trajectoire !');
     swipe.actif = true;
-    swipe.surProgression = (apercu) => monde.majFleche(apercu);
-    swipe.surTir = (params) => this.tirer(params);
+    swipe.surProgression = (points) => {
+      ui.dessinerTrace(points);
+      const dernier = points[points.length - 1];
+      monde.majFleche(monde.cibleDepuisEcran(dernier.x, dernier.y));
+    };
+    swipe.surTir = (geste) => this.tirer(geste);
   }
 
-  tirer(params) {
+  tirer(geste) {
     const { monde, gardien, ui, swipe, difficulte } = this.ctx;
     swipe.actif = false;
     ui.montrerInstruction(null);
+    ui.effacerTrace();
     monde.majFleche(null);
     monde.animerFrappe();
     sons.frappe();
 
+    const cible = monde.cibleDepuisEcran(geste.finX, geste.finY);
     this.sequence = new SequenceTir(monde, gardien, difficulte, false);
     this.sequence.surEvenement = (type) => {
       if (type === 'but') { sons.but(); ui.lancerConfettis(); }
@@ -67,7 +73,7 @@ export class ModePenalty {
       else if (type === 'arret') sons.arret();
       else sons.rate();
     };
-    this.sequence.lancer(params);
+    this.sequence.lancer({ cible, puissance: geste.puissance, spin: geste.spin });
   }
 
   maj(dt) {
@@ -169,6 +175,7 @@ export class ModePenalty {
     swipe.surProgression = null;
     ui.montrerHudTirs(null);
     ui.montrerInstruction(null);
+    ui.effacerTrace();
     monde.majFleche(null);
   }
 }

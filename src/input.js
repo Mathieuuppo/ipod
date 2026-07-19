@@ -1,8 +1,9 @@
 // ============================================================
-// Gestion tactile : analyse du swipe de tir.
-// Le geste est échantillonné en continu ; au relâchement on en
-// déduit direction, puissance et effet (courbure du tracé).
-// Fonctionne aussi à la souris pour tester sur ordinateur.
+// Gestion tactile : tir "à la Score Hero".
+// Le joueur TRACE la trajectoire souhaitée avec le doigt : le
+// point d'arrivée du tracé donne la cible, la longueur donne la
+// puissance et la courbure du tracé donne l'effet (le ballon
+// suit la courbe dessinée). Fonctionne aussi à la souris.
 // ============================================================
 
 import { CONFIG, clamp } from './config.js';
@@ -13,8 +14,8 @@ export class GestionnaireSwipe {
     this.actif = false;        // un swipe autorisé est-il attendu ?
     this.enCours = false;      // le doigt est-il posé ?
     this.points = [];          // échantillons {x, y, t}
-    this.surTir = null;        // callback(parametresTir)
-    this.surProgression = null;// callback(apercu) pendant le geste (flèche de visée)
+    this.surTir = null;        // callback(geste) au relâchement
+    this.surProgression = null;// callback(points) pendant le tracé (ligne à l'écran)
     this.surTap = null;        // callback() sur un tap court (mini-jeu de timing)
 
     // Souris + tactile via Pointer Events
@@ -33,10 +34,7 @@ export class GestionnaireSwipe {
   mouvement(e) {
     if (!this.enCours) return;
     this.points.push({ x: e.clientX, y: e.clientY, t: performance.now() });
-    if (this.surProgression) {
-      const apercu = this.analyser();
-      if (apercu) this.surProgression(apercu);
-    }
+    if (this.surProgression) this.surProgression(this.points);
   }
 
   fin() {
@@ -56,7 +54,10 @@ export class GestionnaireSwipe {
     this.points = [];
   }
 
-  // Convertit le tracé du doigt en paramètres de tir.
+  // Convertit le tracé du doigt en geste de tir (façon Score Hero) :
+  //  - finX/finY : point d'arrivée du tracé à l'écran → la cible visée
+  //  - puissance : longueur du tracé (+ bonus de vitesse du geste)
+  //  - spin      : courbure signée du tracé (bombé à droite = effet à droite)
   // Retourne null si le geste est trop petit pour être un tir.
   analyser() {
     const pts = this.points;
@@ -65,39 +66,35 @@ export class GestionnaireSwipe {
     const p1 = pts[pts.length - 1];
     const dx = p1.x - p0.x;
     const dy = p0.y - p1.y; // vers le haut = positif
-    const longueur = Math.hypot(dx, dy);
+    const corde = Math.hypot(dx, dy);
     const duree = Math.max(0.03, (p1.t - p0.t) / 1000);
 
-    // Seuils : il faut un vrai geste ascendant
+    // Seuils : il faut un vrai tracé ascendant
     const echelle = Math.min(window.innerWidth, window.innerHeight);
-    if (longueur < echelle * 0.08 || dy <= 0) return null;
+    if (corde < echelle * 0.08 || dy <= 0) return null;
 
-    // --- Puissance : vitesse du swipe (px/s normalisés par la taille d'écran)
-    const vitesseNorm = clamp((longueur / duree) / (echelle * 4.5), 0, 1);
+    // --- Puissance : longueur réelle du tracé, avec un bonus si le geste est vif
+    let longueurTrace = 0;
+    for (let i = 1; i < pts.length; i++) {
+      longueurTrace += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    }
+    const partLongueur = clamp(longueurTrace / (echelle * 0.85), 0, 1);
+    const partVitesse = clamp((corde / duree) / (echelle * 5), 0, 1);
+    const vitesseNorm = clamp(0.15 + partLongueur * 0.65 + partVitesse * 0.3, 0, 1);
     const puissance = CONFIG.vitesseMin + vitesseNorm * (CONFIG.vitesseMax - CONFIG.vitesseMin);
 
-    // --- Direction latérale : angle du geste par rapport à la verticale
-    const angleLateral = clamp(
-      Math.atan2(dx, dy) / (Math.PI / 3),   // ±60° de geste → pleine amplitude
-      -1, 1
-    ) * (CONFIG.angleLateralMaxDeg * Math.PI / 180);
-
-    // --- Élévation : plus le swipe est long (verticalement), plus le ballon monte
-    const partVerticale = clamp(dy / (echelle * 0.55), 0, 1);
-    const elevation = (CONFIG.elevationMinDeg +
-      partVerticale * (CONFIG.elevationMaxDeg - CONFIG.elevationMinDeg)) * Math.PI / 180;
-
-    // --- Effet (spin) : écart latéral maximal du tracé par rapport à la corde.
-    // On mesure la déviation signée du point médian → courbe gauche/droite.
+    // --- Effet : déviation latérale maximale du tracé par rapport à la corde.
+    // Normale orientée vers la droite de l'écran → tracé bombé à droite = spin > 0
+    // (le ballon suivra une courbe bombée du même côté que la ligne dessinée).
     let deviationMax = 0;
-    const nx = -(p1.y - p0.y) / (longueur || 1); // normale à la corde
-    const ny = (p1.x - p0.x) / (longueur || 1);
+    const nx = -(p1.y - p0.y) / (corde || 1);
+    const ny = (p1.x - p0.x) / (corde || 1);
     for (const p of pts) {
       const d = (p.x - p0.x) * nx + (p.y - p0.y) * ny;
       if (Math.abs(d) > Math.abs(deviationMax)) deviationMax = d;
     }
-    const spin = clamp(deviationMax / (echelle * 0.14), -1, 1) * CONFIG.spinMax;
+    const spin = clamp(deviationMax / (echelle * 0.16), -1, 1) * CONFIG.spinMax;
 
-    return { puissance, angleLateral, elevation, spin, vitesseNorm };
+    return { finX: p1.x, finY: p1.y, puissance, spin, vitesseNorm };
   }
 }

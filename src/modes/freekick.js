@@ -45,24 +45,32 @@ export class ModeCoupFranc {
 
     this.sequence = null;
     ui.montrerHudTirs(`Tir ${this.tirActuel}/${CONFIG.tirsParSession}   ${this.historique.join('')}`);
-    ui.montrerInstruction('Glisse vers le haut pour tirer !');
+    ui.montrerInstruction('Trace la trajectoire de ton tir !');
 
     swipe.actif = true;
-    swipe.surProgression = (apercu) => monde.majFleche(apercu);
-    swipe.surTir = (params) => this.tirer(params);
+    // Pendant le tracé : ligne à l'écran + flèche au sol vers la cible visée
+    swipe.surProgression = (points) => {
+      ui.dessinerTrace(points);
+      const dernier = points[points.length - 1];
+      monde.majFleche(monde.cibleDepuisEcran(dernier.x, dernier.y));
+    };
+    swipe.surTir = (geste) => this.tirer(geste);
   }
 
-  tirer(params) {
+  tirer(geste) {
     const { monde, gardien, ui, swipe, difficulte } = this.ctx;
     swipe.actif = false;
     ui.montrerInstruction(null);
+    ui.effacerTrace();
     monde.majFleche(null);
     monde.animerFrappe();
     sons.frappe();
 
+    // Le point d'arrivée du tracé devient la cible dans le plan de la cage
+    const cible = monde.cibleDepuisEcran(geste.finX, geste.finY);
     this.sequence = new SequenceTir(monde, gardien, difficulte, true);
     this.sequence.surEvenement = (type) => this.jouerSon(type);
-    this.sequence.lancer(params);
+    this.sequence.lancer({ cible, puissance: geste.puissance, spin: geste.spin });
   }
 
   jouerSon(type) {
@@ -116,6 +124,7 @@ export class ModeCoupFranc {
     swipe.surProgression = null;
     ui.montrerHudTirs(null);
     ui.montrerInstruction(null);
+    ui.effacerTrace();
     monde.majFleche(null);
   }
 }

@@ -32,6 +32,7 @@ export class ModeMatch {
     const { ui, monde } = this.ctx;
     ui.montrerBoutonsJeu(true);
     ui.montrerHudMatch(true);
+    ui.majHudEquipes(this.ctx.matchConfig.equipeJoueur, this.ctx.matchConfig.equipeAdverse);
     ui.majMatch({ minute: 0, scoreJoueur: 0, scoreAdverse: 0 });
     monde.placerCoupFranc(18, 0, 4); // décor d'attente
     sons.sifflet();

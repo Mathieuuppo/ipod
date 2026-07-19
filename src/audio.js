@@ -4,6 +4,8 @@
 // assemblage d'oscillateurs / bruit filtré.
 // ============================================================
 
+import { sauvegarde } from './storage.js';
+
 let ctx = null;
 
 // Le contexte audio doit être créé après un geste utilisateur (règle mobile)
@@ -12,9 +14,11 @@ export function initAudio() {
     try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
   }
   if (ctx.state === 'suspended') ctx.resume();
+  // La musique de menu peut enfin démarrer si elle était demandée
+  musique.demarrer();
 }
 
-function pret() { return ctx && ctx.state === 'running'; }
+function pret() { return ctx && ctx.state === 'running' && sauvegarde.donnees.reglages.sons; }
 
 // Buffer de bruit blanc réutilisable (pour frappe / foule)
 let bufferBruit = null;
@@ -105,5 +109,56 @@ export const sons = {
   clic() {
     if (!pret()) return;
     jouerTon({ freq: 700, duree: 0.06, type: 'square', volume: 0.15, glisse: 900 });
+  },
+};
+
+// ---------- Musique d'ambiance des menus ----------
+// Nappe discrète : deux oscillateurs légèrement désaccordés + trémolo
+// lent, le tout en boucle. Zéro fichier audio, tout est synthétisé.
+
+export const musique = {
+  noeuds: null,
+  souhaitee: false, // true uniquement dans les menus (jamais en match)
+
+  demarrer() {
+    if (!this.souhaitee || this.noeuds || !ctx || ctx.state !== 'running') return;
+    if (!sauvegarde.donnees.reglages.musique || !sauvegarde.donnees.reglages.sons) return;
+
+    const sortie = ctx.createGain();
+    sortie.gain.value = 0;
+    sortie.gain.linearRampToValueAtTime(0.045, ctx.currentTime + 2);
+    sortie.connect(ctx.destination);
+
+    const oscillateurs = [];
+    for (const [freq, detune] of [[110, 0], [164.8, 4], [220, -5]]) {
+      const o = ctx.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = freq;
+      o.detune.value = detune;
+      o.connect(sortie);
+      o.start();
+      oscillateurs.push(o);
+    }
+    // Trémolo lent : la nappe "respire"
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.13;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 0.02;
+    lfo.connect(lfoGain).connect(sortie.gain);
+    lfo.start();
+
+    this.noeuds = { sortie, oscillateurs, lfo };
+  },
+
+  arreter() {
+    if (!this.noeuds) return;
+    const { sortie, oscillateurs, lfo } = this.noeuds;
+    sortie.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.6);
+    setTimeout(() => {
+      for (const o of oscillateurs) o.stop();
+      lfo.stop();
+      sortie.disconnect();
+    }, 700);
+    this.noeuds = null;
   },
 };

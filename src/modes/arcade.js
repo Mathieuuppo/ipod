@@ -22,22 +22,46 @@ import { CONFIG, DIFFICULTES, clamp, alea } from '../config.js';
 import { TERRAIN } from '../world.js';
 import { sauvegarde } from '../storage.js';
 import { sons } from '../audio.js';
+import { statsEquipe } from '../data/equipes.js';
 
 const L = TERRAIN.longueur;
 const DEMI = TERRAIN.demiLargeur;
 const BUT_X = CONFIG.butDemiLargeur;
 const BUT_Y = CONFIG.butHauteur;
 
-// Formation 4-4-2 : position x de chaque poste, et décalage z de sa
+// Formations tactiques : position x de chaque poste, et décalage z de sa
 // ligne par rapport au centre du bloc (positif = vers son propre but).
-// Indices 0-3 : défenseurs, 4-7 : milieux, 8-9 : attaquants.
-const FORMATION = [
-  { x: -15, ligne: 15 }, { x: -5, ligne: 15 }, { x: 5, ligne: 15 }, { x: 15, ligne: 15 },
-  { x: -16, ligne: 3 }, { x: -5.5, ligne: 3 }, { x: 5.5, ligne: 3 }, { x: 16, ligne: 3 },
-  { x: -7, ligne: -11 }, { x: 7, ligne: -11 },
-];
-const ATTAQUANTS = [8, 9];
-const INDICE_ATTAQUANT = 8; // pour l'engagement
+// `attaquants` = indices des joueurs qui font les appels en profondeur.
+const FORMATIONS = {
+  442: {
+    postes: [
+      { x: -15, ligne: 15 }, { x: -5, ligne: 15 }, { x: 5, ligne: 15 }, { x: 15, ligne: 15 },
+      { x: -16, ligne: 3 }, { x: -5.5, ligne: 3 }, { x: 5.5, ligne: 3 }, { x: 16, ligne: 3 },
+      { x: -7, ligne: -11 }, { x: 7, ligne: -11 },
+    ],
+    attaquants: [8, 9],
+  },
+  433: {
+    postes: [
+      { x: -15, ligne: 15 }, { x: -5, ligne: 15 }, { x: 5, ligne: 15 }, { x: 15, ligne: 15 },
+      { x: -10, ligne: 4 }, { x: 0, ligne: 5 }, { x: 10, ligne: 4 },
+      { x: -14, ligne: -10 }, { x: 0, ligne: -12 }, { x: 14, ligne: -10 },
+    ],
+    attaquants: [7, 8, 9],
+  },
+  352: {
+    postes: [
+      { x: -10, ligne: 15 }, { x: 0, ligne: 16 }, { x: 10, ligne: 15 },
+      { x: -17, ligne: 2 }, { x: -8, ligne: 4 }, { x: 0, ligne: 5 }, { x: 8, ligne: 4 }, { x: 17, ligne: 2 },
+      { x: -6, ligne: -11 }, { x: 6, ligne: -11 },
+    ],
+    attaquants: [8, 9],
+  },
+};
+
+// Effets des réglages tactiques (écran Composition)
+const BLOCS = { bas: -3.5, moyen: 0, haut: 3.5 };
+const STYLES = { defensif: -2.5, equilibre: 0, offensif: 2.5 };
 
 // Un joueur de champ (mesh voxel + état de déplacement)
 class Joueur {
@@ -94,12 +118,40 @@ export class ModeArcade {
   }
 
   demarrer() {
-    const { monde, ui, swipe, difficulte } = this.ctx;
+    const { monde, ui, swipe, difficulte, matchConfig } = this.ctx;
     this.reglages = DIFFICULTES[difficulte];
     swipe.actif = false; // pas de tir tracé ici : joystick + boutons
 
+    // Clubs, tactique et stats d'équipe : tout vient des écrans de menu
+    this.equipeJoueur = matchConfig.equipeJoueur;
+    this.equipeAdverse = matchConfig.equipeAdverse;
+    this.tactique = sauvegarde.donnees.tactique;
+    this.formBleu = FORMATIONS[this.tactique.formation] || FORMATIONS['442'];
+    this.formRouge = FORMATIONS['442'];
+
+    // Les stats moyennes des effectifs modulent le moteur : un club
+    // rapide court plus vite, un club adroit cadre plus ses tirs…
+    const statsJ = statsEquipe(this.equipeJoueur);
+    const statsA = statsEquipe(this.equipeAdverse);
+    this.vJoueur = CONFIG.arcadeVitesseJoueur * (0.9 + (statsJ.vitesse - 60) / 160);
+    this.vIA = this.reglages.arcadeVitesseIA * (0.9 + (statsA.vitesse - 60) / 160);
+    this.precisionIA = clamp(this.reglages.arcadePrecisionIA * (0.75 + (statsA.tir - 60) / 100), 0.15, 0.85);
+    this.reactionVol = this.reglages.arcadeReactionIA * (1 - (statsA.defense - 60) / 250);
+    this.reussiteTacle = clamp(0.6 + (statsJ.defense - 60) / 120, 0.4, 0.92);
+    this.facteurTemps = sauvegarde.donnees.reglages.vitesse === 'lent' ? 0.75 : 1;
+
+    // Statistiques du match : [joueur, adverse]
+    this.statsMatch = { possession: [0, 0], tirs: [0, 0], cadres: [0, 0] };
+    this.dernierTir = null; // { equipe, temps } pour compter les tirs cadrés
+
+    // Replay : mémoire des ~2,5 dernières secondes de jeu
+    this.replayTampon = [];
+    this.replayLecture = null;
+
     const acteurs = monde.creerActeursArcade(CONFIG.arcadeJoueursParEquipe);
     monde.modeArcade(true);
+    monde.colorierEquipesArcade(this.equipeJoueur, this.equipeAdverse);
+    ui.majHudEquipes(this.equipeJoueur, this.equipeAdverse);
 
     this.bleus = acteurs.bleu.map((m, i) => new Joueur(m, 'bleu', i));
     this.rouges = acteurs.rouge.map((m, i) => new Joueur(m, 'rouge', i));
@@ -139,16 +191,19 @@ export class ModeArcade {
   // Replace tout le monde pour un engagement au centre
   engagement(equipe) {
     for (let i = 0; i < this.bleus.length; i++) {
-      const f = FORMATION[i];
-      this.bleus[i].placer(f.x, clamp(L / 2 + f.ligne * 1.1, 3, L - 3));
-      this.rouges[i].placer(-f.x, clamp(L / 2 - f.ligne * 1.1, 3, L - 3));
+      const fB = this.formBleu.postes[i];
+      const fR = this.formRouge.postes[i];
+      this.bleus[i].placer(fB.x, clamp(L / 2 + fB.ligne * 1.1, 3, L - 3));
+      this.rouges[i].placer(-fR.x, clamp(L / 2 - fR.ligne * 1.1, 3, L - 3));
     }
     this.gardienA.placer(0, 1.0);
     this.gardienB.placer(0, L - 1.0);
     Object.assign(this.ballon, { x: 0, y: CONFIG.rayonBallon, z: L / 2, vx: 0, vy: 0, vz: 0 });
     this.receveur = null;
     this.remise = null;
-    const receveur = equipe === 'bleu' ? this.bleus[INDICE_ATTAQUANT] : this.rouges[INDICE_ATTAQUANT];
+    const receveur = equipe === 'bleu'
+      ? this.bleus[this.formBleu.attaquants[0]]
+      : this.rouges[this.formRouge.attaquants[0]];
     receveur.placer(0, L / 2 + (equipe === 'bleu' ? 1.2 : -1.2));
     this.porteur = receveur;
     this.dernierToucheur = equipe;
@@ -236,14 +291,19 @@ export class ModeArcade {
       const dist = Math.hypot(viseX - p.x, p.z);
       const erreur = alea(-1, 1) * dist * 0.045;
       const dx = viseX + erreur - p.x, dz = -p.z;
+      this.statsMatch.tirs[0]++;
+      this.dernierTir = { equipe: 0, temps: this.tempsEcoule };
       this.frapper(p, dx, dz, CONFIG.arcadeVitesseTir, clamp(dist * 0.16, 1.2, 4.6));
       sons.frappe();
+      ui.vibrer(25);
     } else if (this.cooldownTacle <= 0) {
       this.cooldownTacle = 0.8;
       const cible = this.porteur;
       if (cible && cible.equipe === 'rouge' && this.controle.dist(cible.x, cible.z) < 1.6) {
-        if (Math.random() < 0.75) this.ballonLibre(cible, 2.5);
+        // La réussite du tacle dépend de la défense moyenne de ton club
+        if (Math.random() < this.reussiteTacle) this.ballonLibre(cible, 2.5);
         sons.clic();
+        ui.vibrer(20);
       }
     }
   }
@@ -295,6 +355,14 @@ export class ModeArcade {
   maj(dt) {
     if (this.etat === 'fini') return;
     const { ui, monde } = this.ctx;
+    dt *= this.facteurTemps; // réglage "vitesse de jeu : lente"
+
+    // Lecture d'un replay de but : on rejoue les images enregistrées
+    // au ralenti avec une caméra rapprochée, puis on reprend le cours
+    if (this.etat === 'replay') {
+      this.majReplay(dt);
+      return;
+    }
 
     this.tempsEcoule += dt;
     const minute = Math.min(90, Math.floor(this.tempsEcoule / CONFIG.arcadeSecondesParMinute));
@@ -330,6 +398,13 @@ export class ModeArcade {
       this.separerCoequipiers(this.rouges, dt);
       this.majGardiens(dt);
       this.majBallon(dt);
+
+      // Possession : au crédit de la dernière équipe qui a touché le ballon
+      this.statsMatch.possession[this.dernierToucheur === 'bleu' ? 0 : 1] += dt;
+
+      // Mémoire pour le replay (2,5 s glissantes)
+      this.replayTampon.push(this.instantane());
+      if (this.replayTampon.length > 150) this.replayTampon.shift();
     }
 
     // Animations + marqueurs + caméra
@@ -346,6 +421,43 @@ export class ModeArcade {
     monde.suivreCameraArcade(this.ballon.x, this.ballon.z, dt);
   }
 
+  // ---------- Replay de but ----------
+
+  // Photographie de l'instant : ballon + position/orientation de chacun
+  instantane() {
+    const acteurs = [...this.bleus, ...this.rouges, this.gardienA, this.gardienB];
+    return {
+      b: [this.ballon.x, this.ballon.y, this.ballon.z],
+      js: acteurs.map((j) => [j.x, j.z, j.mesh.rotation.y]),
+    };
+  }
+
+  majReplay(dt) {
+    const { monde } = this.ctx;
+    const lecture = this.replayLecture;
+    lecture.i += dt * 30; // ~moitié de la cadence d'enregistrement : ralenti
+    const frame = lecture.frames[Math.min(Math.floor(lecture.i), lecture.frames.length - 1)];
+
+    // Applique l'image : ballon + joueurs (sans passer par l'IA)
+    const acteurs = [...this.bleus, ...this.rouges, this.gardienA, this.gardienB];
+    frame.js.forEach(([x, z, rot], i) => {
+      acteurs[i].mesh.position.set(x, 0, z);
+      acteurs[i].mesh.rotation.y = rot;
+    });
+    monde.ballon.position.set(frame.b[0], frame.b[1], frame.b[2]);
+
+    // Caméra de replay : basse et rapprochée, côté terrain
+    monde.camera.position.set(frame.b[0] * 0.4 + 8, 4.2, frame.b[2] + 9);
+    monde.camera.lookAt(frame.b[0], 0.6, frame.b[2]);
+
+    if (lecture.i >= lecture.frames.length) {
+      // Fin du replay → petite pause puis engagement
+      this.replayLecture = null;
+      this.etat = 'pause';
+      this.tempsPause = 1.0;
+    }
+  }
+
   // Le joueur contrôlé suit le joystick (écran haut = vers la cage adverse)
   majJoueurControle(dt) {
     const j = this.ctx.ui.joystick;
@@ -353,12 +465,12 @@ export class ModeArcade {
     if (this.receveur === c && !j.actif) {
       // Receveur d'une passe : il va au-devant du ballon tout seul
       c.chercher(this.ballon.x + this.ballon.vx * 0.15, this.ballon.z + this.ballon.vz * 0.15,
-        CONFIG.arcadeVitesseJoueur, dt);
+        this.vJoueur, dt);
       return;
     }
     if (j.actif && (Math.abs(j.x) > 0.12 || Math.abs(j.y) > 0.12)) {
-      c.vx = j.x * CONFIG.arcadeVitesseJoueur;
-      c.vz = j.y * CONFIG.arcadeVitesseJoueur;
+      c.vx = j.x * this.vJoueur;
+      c.vz = j.y * this.vJoueur;
     } else {
       c.vx *= 0.8; c.vz *= 0.8;
     }
@@ -373,17 +485,23 @@ export class ModeArcade {
   //   > tenue de poste dans le bloc.
   majEquipe(equipe, dt) {
     const joueurs = equipe === 'bleu' ? this.bleus : this.rouges;
-    const vitesseBase = equipe === 'bleu'
-      ? CONFIG.arcadeVitesseJoueur * 0.92
-      : this.reglages.arcadeVitesseIA;
+    const forme = equipe === 'bleu' ? this.formBleu : this.formRouge;
+    const vitesseBase = equipe === 'bleu' ? this.vJoueur * 0.92 : this.vIA;
     // Sens d'attaque en z : les bleus attaquent z=0, les rouges z=L
     const dirAtt = equipe === 'bleu' ? -1 : 1;
     const porteurAmi = this.porteur && this.porteur.equipe === equipe ? this.porteur : null;
     const porteurAdverse = this.porteur && this.porteur.equipe !== equipe ? this.porteur : null;
     const enRemise = this.etat === 'remise';
 
-    // Centre du bloc : suit le ballon, monte un peu quand on a le ballon
-    const base = clamp(this.ballon.z + (porteurAmi ? dirAtt * 4 : dirAtt * -2), 10, L - 10);
+    // Réglages tactiques du joueur (l'IA adverse reste sur son plan)
+    const hauteurTactique = equipe === 'bleu'
+      ? BLOCS[this.tactique.bloc] + STYLES[this.tactique.style] : 0;
+
+    // Centre du bloc : suit le ballon, monte un peu quand on a le ballon,
+    // et applique la hauteur de bloc choisie dans l'écran tactique
+    const base = clamp(
+      this.ballon.z + (porteurAmi ? dirAtt * 4 : dirAtt * -2) + dirAtt * hauteurTactique,
+      10, L - 10);
 
     // Chasseur : UN SEUL joueur va au ballon libre (pas pendant une remise)
     const chasseur = (!this.porteur && !enRemise)
@@ -412,10 +530,15 @@ export class ModeArcade {
         continue;
       }
       if (j === presseur) {
-        // Presse franchement dans sa moitié de terrain, contient sinon
-        const dansSaMoitie = equipe === 'bleu'
-          ? this.ballon.z > L / 2 - 4 : this.ballon.z < L / 2 + 4;
-        if (dansSaMoitie) {
+        // Zone de pressing : réglage tactique côté bleu (faible = seulement
+        // près de son but, fort = presse partout), plan fixe côté rouge
+        let limite = equipe === 'bleu' ? L / 2 - 4 : L / 2 + 4;
+        if (equipe === 'bleu') {
+          if (this.tactique.pressing === 'faible') limite = L * 0.68;
+          if (this.tactique.pressing === 'fort') limite = -L; // partout
+        }
+        const presseIci = equipe === 'bleu' ? this.ballon.z > limite : this.ballon.z < limite;
+        if (presseIci) {
           j.chercher(porteurAdverse.x, porteurAdverse.z, vitesseBase * 0.95, dt);
         } else {
           // Se place entre le porteur et son but, à distance : il "cadre"
@@ -432,10 +555,10 @@ export class ModeArcade {
           vitesseBase * 0.85, dt);
         continue;
       }
-      if (porteurAmi && ATTAQUANTS.includes(j.indice)) {
+      if (porteurAmi && forme.attaquants.includes(j.indice)) {
         // Appel en profondeur : les attaquants étirent le bloc adverse
         // et se tiennent prêts pour la passe en profondeur
-        const cible = FORMATION[j.indice];
+        const cible = forme.postes[j.indice];
         const xAppel = equipe === 'bleu' ? cible.x : -cible.x;
         j.chercher(
           clamp(xAppel + this.ballon.x * 0.25, -DEMI + 1.5, DEMI - 1.5),
@@ -444,8 +567,8 @@ export class ModeArcade {
         continue;
       }
 
-      // Tenue de poste : sa ligne du 4-4-2, qui coulisse avec le bloc
-      const f = FORMATION[j.indice];
+      // Tenue de poste : sa ligne de la formation, qui coulisse avec le bloc
+      const f = forme.postes[j.indice];
       const xPoste = equipe === 'bleu' ? f.x : -f.x;
       const tz = clamp(base - dirAtt * f.ligne, 2.5, L - 2.5);
       const tx = clamp(xPoste + this.ballon.x * 0.15, -DEMI + 1, DEMI - 1);
@@ -456,7 +579,7 @@ export class ModeArcade {
     if (equipe === 'rouge' && porteurAdverse && porteurAdverse.equipe === 'bleu' && presseur &&
         presseur.dist(porteurAdverse.x, porteurAdverse.z) < 0.9) {
       this.contactVol += dt;
-      if (this.contactVol > this.reglages.arcadeReactionIA) {
+      if (this.contactVol > this.reactionVol) {
         this.contactVol = 0;
         this.ballonLibre(porteurAdverse, 2.2);
       }
@@ -470,11 +593,10 @@ export class ModeArcade {
   majPorteurRouge(dt) {
     const p = this.porteur && this.porteur.equipe === 'rouge' ? this.porteur : null;
     if (!p) return;
-    const r = this.reglages;
     const pression = this.controle.dist(p.x, p.z) < 3;
 
     // Il avance doucement s'il est seul, accélère sous pression
-    p.chercher(p.x * 0.75, L - 3, r.arcadeVitesseIA * (pression ? 0.95 : 0.6), dt);
+    p.chercher(p.x * 0.75, L - 3, this.vIA * (pression ? 0.95 : 0.6), dt);
 
     this.decisionIA -= dt;
     if (this.decisionIA > 0) return;
@@ -482,9 +604,11 @@ export class ModeArcade {
 
     const distBut = L - p.z;
     if (distBut < 13 && Math.random() < 0.55) {
-      // Tir : cadré ou non selon la précision de la difficulté
-      const cadre = Math.random() < r.arcadePrecisionIA;
+      // Tir : cadré ou non selon la précision (difficulté × qualité du club)
+      const cadre = Math.random() < this.precisionIA;
       const viseX = cadre ? alea(-2.9, 2.9) : (Math.random() < 0.5 ? -1 : 1) * alea(4.2, 6);
+      this.statsMatch.tirs[1]++;
+      this.dernierTir = { equipe: 1, temps: this.tempsEcoule };
       this.frapper(p, viseX - p.x, L - p.z, CONFIG.arcadeVitesseTir * 0.95, clamp(distBut * 0.15, 1.2, 4));
       sons.frappe();
     } else if (pression || Math.random() < 0.45) {
@@ -524,6 +648,12 @@ export class ModeArcade {
   // puis relancent proprement sur un coéquipier
   majGardiens(dt) {
     const relancer = (g) => {
+      // Un tir récent capté par le gardien compte comme tir cadré
+      if (this.dernierTir && this.tempsEcoule - this.dernierTir.temps < 1.6) {
+        this.statsMatch.cadres[this.dernierTir.equipe]++;
+        this.dernierTir = null;
+        this.ctx.ui.vibrer(35);
+      }
       const equipe = g === this.gardienA ? this.rouges : this.bleus;
       let meilleur = equipe[4], score = -1e9;
       for (const c of equipe) {
@@ -679,24 +809,36 @@ export class ModeArcade {
 
   but(equipe) {
     const { ui } = this.ctx;
+    const indice = equipe === 'bleu' ? 0 : 1;
+    this.statsMatch.cadres[indice]++;
     if (equipe === 'bleu') {
       this.scoreJoueur++;
       sons.but();
       ui.lancerConfettis();
-      ui.montrerMessage(`BUT ! ⚽ ${this.scoreJoueur}-${this.scoreAdverse}`, 1800);
+      ui.vibrer([70, 40, 100]);
+      ui.montrerMessage(`BUT ! ⚽ ${this.scoreJoueur}-${this.scoreAdverse}`, 2600);
       this.prochainEngagement = 'rouge';
     } else {
       this.scoreAdverse++;
       sons.rate();
-      ui.montrerMessage(`BUT ADVERSE… ${this.scoreJoueur}-${this.scoreAdverse}`, 1800);
+      ui.vibrer(60);
+      ui.montrerMessage(`BUT ADVERSE… ${this.scoreJoueur}-${this.scoreAdverse}`, 2600);
       this.prochainEngagement = 'bleu';
     }
     ui.majMatch({ minute: this.minute, scoreJoueur: this.scoreJoueur, scoreAdverse: this.scoreAdverse });
-    this.etat = 'pause';
-    this.tempsPause = 1.8;
     this.porteur = null;
     this.receveur = null;
     this.ballon.vx = this.ballon.vz = this.ballon.vy = 0;
+
+    // Replay du but si on a assez d'images en mémoire, sinon simple pause
+    if (this.replayTampon.length > 45) {
+      this.replayLecture = { frames: this.replayTampon.slice(-140), i: 0 };
+      this.replayTampon = [];
+      this.etat = 'replay';
+    } else {
+      this.etat = 'pause';
+      this.tempsPause = 1.8;
+    }
   }
 
   terminer() {
@@ -708,12 +850,26 @@ export class ModeArcade {
     const victoire = diff > 0, nul = diff === 0;
     const etoiles = victoire ? (diff >= 2 ? 3 : 2) : nul ? 1 : 0;
     sauvegarde.enregistrerEtoiles(this.nom, difficulte, etoiles);
+    sauvegarde.enregistrerMatch(this.scoreJoueur, this.scoreAdverse);
+
+    // Statistiques du match pour l'écran de résultat
+    const poss = this.statsMatch.possession;
+    const total = poss[0] + poss[1] || 1;
+    const statsMatch = [
+      { libelle: 'Possession (%)', joueur: Math.round(100 * poss[0] / total), adverse: Math.round(100 * poss[1] / total) },
+      { libelle: 'Tirs', joueur: this.statsMatch.tirs[0], adverse: this.statsMatch.tirs[1] },
+      { libelle: 'Tirs cadrés', joueur: this.statsMatch.cadres[0], adverse: this.statsMatch.cadres[1] },
+    ];
+
+    // Le score est transmis à main.js (utile pour la Coupe Lucarne)
+    this.ctx.dernierScore = { joueur: this.scoreJoueur, adverse: this.scoreAdverse };
 
     this.nettoyer();
     ui.montrerResultat({
       titre: victoire ? 'VICTOIRE ! 🏆' : nul ? 'Match nul' : 'Défaite…',
-      detail: `Score final : ${this.scoreJoueur} - ${this.scoreAdverse}`,
+      detail: `${this.equipeJoueur.court}  ${this.scoreJoueur} - ${this.scoreAdverse}  ${this.equipeAdverse.court}`,
       etoiles,
+      statsMatch,
     });
     surFin();
   }

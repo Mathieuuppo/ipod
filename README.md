@@ -1,8 +1,10 @@
-# ⚽ Free Kick Champions
+# ⚽ LUCARNE — Free Kick Champions
 
-Jeu de football mobile en HTML5 / Three.js, style low-poly « voxel » :
-coups francs, penaltys et matchs accélérés, jouables au doigt dans un
-navigateur mobile (portrait).
+Jeu de football mobile complet en HTML5 / Three.js, style low-poly
+« voxel », identité « soirée de match » (bleu nuit / or champion) :
+coups francs façon Score Hero, penaltys, matchs 11 contre 11 vus d'en
+haut, coupe à élimination directe, 12 clubs fictifs avec effectifs et
+tactiques — le tout jouable au doigt dans un navigateur mobile.
 
 ## Lancer le jeu
 
@@ -83,3 +85,22 @@ Les personnages sont des assemblages de cubes construits par
 `creerFigurine()` dans `src/world.js` : pour améliorer les graphismes plus
 tard, il suffit de remplacer cette fonction (par un chargement glTF par
 exemple) sans toucher à la logique de jeu.
+
+## L'application autour du jeu
+
+- **Sélection d'équipe** : 12 clubs fictifs (blasons générés, note en
+  étoiles), choix séparé de son club et de l'adversaire, personnalisation
+  du capitaine (nom + numéro floqué dans le dos du tireur).
+- **Composition & tactique** : effectif de 16 joueurs générés avec stats
+  (vitesse / tir / passe / défense), choix de formation (4-4-2, 4-3-3,
+  3-5-2) et réglages bloc / pressing / style — tout est réellement branché
+  sur le moteur d'IA du mode arcade.
+- **Coupe Lucarne** : tournoi à élimination directe contre 7 clubs
+  (quarts → finale) avec bracket visuel et résultats simulés.
+- **Statistiques** : buts, séries, matchs, réussite penalty, coupes.
+- **Réglages** : sons, musique de menu, vibrations, vitesse de jeu,
+  réinitialisation de la progression.
+- **Replay de but** : les dernières secondes avant chaque but du mode
+  arcade sont rejouées au ralenti avec une caméra rapprochée.
+- **Stats de match** : possession, tirs et tirs cadrés sur l'écran de
+  fin de match.

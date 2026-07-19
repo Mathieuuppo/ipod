@@ -1,14 +1,16 @@
 // ============================================================
-// Point d'entrée : construit le monde 3D, l'UI et les modes,
-// gère la navigation entre écrans et fait tourner la boucle
-// de jeu (requestAnimationFrame via Monde.rendre()).
+// Point d'entrée : construit le monde 3D, l'UI, les menus et
+// les modes, puis fait tourner la boucle de jeu.
 // ============================================================
 
 import { Monde } from './world.js';
 import { Gardien } from './keeper.js';
 import { UI } from './ui.js';
+import { Menus } from './menus.js';
 import { GestionnaireSwipe } from './input.js';
-import { initAudio, sons } from './audio.js';
+import { initAudio, sons, musique } from './audio.js';
+import { sauvegarde } from './storage.js';
+import { equipeParId } from './data/equipes.js';
 import { ModeCoupFranc } from './modes/freekick.js';
 import { ModePenalty } from './modes/penalty.js';
 import { ModeMatch } from './modes/match.js';
@@ -26,13 +28,15 @@ const swipe = new GestionnaireSwipe(monde.renderer.domElement);
 monde.placerCoupFranc(18, 0, 4);
 
 let modeActif = null;
-let dernierChoix = { mode: 'freekick', difficulte: 'moyen' };
+let dernierLancement = null; // { mode, difficulte, options } pour REJOUER
 
 // Contexte partagé injecté dans chaque mode
 const ctx = {
   monde, gardien, ui, swipe,
   difficulte: 'moyen',
-  surFin: () => { modeActif = null; }, // le mode a affiché son écran de résultat
+  matchConfig: null,   // { equipeJoueur, equipeAdverse } rempli au lancement
+  dernierScore: null,  // { joueur, adverse } déposé par le mode arcade
+  surFin: () => finDeMode(),
 };
 
 const FABRIQUES = {
@@ -42,18 +46,43 @@ const FABRIQUES = {
   arcade: () => new ModeArcade(ctx),
 };
 
-// ---------- Navigation ----------
+// ---------- Lancement / fin des parties ----------
 
-function demarrerJeu(mode, difficulte) {
-  dernierChoix = { mode, difficulte };
+function demarrerJeu(mode, difficulte, options = {}) {
+  dernierLancement = { mode, difficulte, options };
   ctx.difficulte = difficulte;
+
+  // Clubs du match : le mien + l'adversaire (imposé en Coupe Lucarne)
+  const equipeJoueur = equipeParId(sauvegarde.donnees.equipeId);
+  const equipeAdverse = equipeParId(options.adversaireId || sauvegarde.donnees.adversaireId);
+  ctx.matchConfig = { equipeJoueur, equipeAdverse };
+  ctx.dernierScore = null;
+
+  // Le tireur des modes de tir porte mes couleurs et mon numéro
+  monde.personnaliserTireur(equipeJoueur, sauvegarde.donnees.perso.numero);
+
+  musique.souhaitee = false; // silence d'avant-match, place aux bruits du stade
+  musique.arreter();
   ui.cacherEcrans();
   gardien.reinitialiser();
   modeActif = FABRIQUES[mode]();
   modeActif.demarrer();
 }
 
-function quitterVersMenu() {
+// Fin naturelle d'un mode (écran de résultat déjà affiché par le mode)
+function finDeMode() {
+  const enCompetition = dernierLancement?.options?.competition;
+  modeActif = null;
+  if (enCompetition && ctx.dernierScore) {
+    menus.enregistrerResultatCompetition(ctx.dernierScore.joueur, ctx.dernierScore.adverse);
+    // Après un match de coupe, "REJOUER" n'a pas de sens : on masque
+    document.getElementById('btn-rejouer').classList.add('cache');
+  } else {
+    document.getElementById('btn-rejouer').classList.remove('cache');
+  }
+}
+
+function quitterVersMenu(ecran = 'menu') {
   if (modeActif) {
     modeActif.quitter();
     modeActif = null;
@@ -62,48 +91,37 @@ function quitterVersMenu() {
   ui.montrerHudMatch(false);
   monde.placerCoupFranc(18, 0, 4);
   gardien.reinitialiser();
-  ui.montrerEcran('titre');
+  menus.naviguer(ecran);
 }
 
-let modeChoisi = 'freekick';
+const menus = new Menus({ ui, demarrerJeu });
 
+// Boutons transverses (en jeu + écran de résultat)
 function brancher(id, action) {
   document.getElementById(id).addEventListener('click', () => { sons.clic(); action(); });
 }
-
-brancher('btn-jouer', () => ui.montrerEcran('modes'));
-brancher('btn-retour-titre', () => ui.montrerEcran('titre'));
-brancher('btn-retour-modes', () => ui.montrerEcran('modes'));
-brancher('btn-quitter', quitterVersMenu);
+brancher('btn-quitter', () => quitterVersMenu(menus.apresResultat));
 brancher('btn-photo', () => monde.photo());
-brancher('btn-rejouer', () => demarrerJeu(dernierChoix.mode, dernierChoix.difficulte));
-brancher('btn-resultat-menu', quitterVersMenu);
-
-for (const btn of document.querySelectorAll('#ecran-modes .btn-mode')) {
-  btn.addEventListener('click', () => {
-    sons.clic();
-    modeChoisi = btn.dataset.mode;
-    ui.montrerEcran('difficulte');
-  });
-}
-for (const btn of document.querySelectorAll('#ecran-difficulte .btn-mode')) {
-  btn.addEventListener('click', () => {
-    sons.clic();
-    demarrerJeu(modeChoisi, btn.dataset.difficulte);
-  });
-}
+brancher('btn-rejouer', () => {
+  const { mode, difficulte, options } = dernierLancement;
+  demarrerJeu(mode, difficulte, options);
+});
+brancher('btn-resultat-menu', () => quitterVersMenu(menus.apresResultat));
 
 // ---------- Verrous mobile ----------
 
 // L'audio ne peut démarrer qu'après un geste utilisateur
-document.addEventListener('pointerdown', initAudio, { once: false });
-// Bloque le pull-to-refresh / scroll élastique restant
-document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+document.addEventListener('pointerdown', initAudio);
+// Bloque le pull-to-refresh / scroll élastique restant (mais pas les
+// champs de saisie des menus)
+document.addEventListener('touchmove', (e) => {
+  if (e.target.tagName !== 'INPUT') e.preventDefault();
+}, { passive: false });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // ---------- Boucle de jeu ----------
 
-ui.montrerEcran('titre');
+menus.naviguer('titre');
 
 function boucle() {
   requestAnimationFrame(boucle);

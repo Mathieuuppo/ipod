@@ -1,5 +1,7 @@
 // ============================================================
-// Sauvegarde locale (localStorage) : totaux, série et étoiles.
+// Sauvegarde locale (localStorage) : progression, étoiles,
+// équipe choisie, tactique, réglages, statistiques globales
+// et compétition en cours.
 // ============================================================
 
 const CLE = 'freekick-champions-v1';
@@ -15,19 +17,48 @@ const DEFAUT = {
     match: { facile: 0, moyen: 0, difficile: 0 },
     arcade: { facile: 0, moyen: 0, difficile: 0 },
   },
+
+  // Identité du joueur : son club, son adversaire favori, son numéro 10
+  equipeId: 'royal',
+  adversaireId: 'valbourg',
+  perso: { nom: 'Capitaine', numero: 10 },
+
+  // Tactique appliquée au mode arcade
+  tactique: { formation: '442', bloc: 'moyen', pressing: 'moyen', style: 'equilibre' },
+
+  // Réglages
+  reglages: { sons: true, musique: true, vibrations: true, vitesse: 'normal' },
+
+  // Statistiques globales de carrière
+  statsGlobales: {
+    matchsJoues: 0, matchsGagnes: 0, matchsNuls: 0,
+    butsMarques: 0, butsEncaisses: 0,
+    penaltysTires: 0, penaltysMarques: 0,
+    coupesGagnees: 0,
+  },
+
+  // Compétition en cours : null ou { tour, equipes: [ids], resultats }
+  competition: null,
 };
 
 function charger() {
   try {
     const brut = localStorage.getItem(CLE);
     if (!brut) return structuredClone(DEFAUT);
-    // Fusion avec les valeurs par défaut pour tolérer les anciennes versions
+    // Fusion profonde simple avec les valeurs par défaut (tolère les
+    // sauvegardes des anciennes versions du jeu)
     const donnees = JSON.parse(brut);
     const fusion = structuredClone(DEFAUT);
-    Object.assign(fusion, donnees);
-    for (const mode of Object.keys(DEFAUT.etoiles)) {
-      fusion.etoiles[mode] = { ...DEFAUT.etoiles[mode], ...(donnees.etoiles?.[mode] || {}) };
-    }
+    const fusionner = (cible, source) => {
+      for (const [k, v] of Object.entries(source || {})) {
+        if (v && typeof v === 'object' && !Array.isArray(v) && cible[k] && typeof cible[k] === 'object') {
+          fusionner(cible[k], v);
+        } else if (v !== undefined) {
+          cible[k] = v;
+        }
+      }
+    };
+    fusionner(fusion, donnees);
     return fusion;
   } catch {
     return structuredClone(DEFAUT);
@@ -41,6 +72,11 @@ export const sauvegarde = {
     try { localStorage.setItem(CLE, JSON.stringify(this.donnees)); } catch { /* stockage indisponible */ }
   },
 
+  reinitialiser() {
+    this.donnees = structuredClone(DEFAUT);
+    this.ecrire();
+  },
+
   // À appeler après chaque tir du joueur pour tenir les compteurs
   enregistrerTir(estBut) {
     if (estBut) {
@@ -52,6 +88,23 @@ export const sauvegarde = {
     } else {
       this.donnees.serieEnCours = 0;
     }
+    this.ecrire();
+  },
+
+  enregistrerPenalty(estBut) {
+    this.donnees.statsGlobales.penaltysTires++;
+    if (estBut) this.donnees.statsGlobales.penaltysMarques++;
+    this.enregistrerTir(estBut); // écrit aussi
+  },
+
+  // Fin d'un match arcade : résultat + buts
+  enregistrerMatch(butsPour, butsContre) {
+    const s = this.donnees.statsGlobales;
+    s.matchsJoues++;
+    if (butsPour > butsContre) s.matchsGagnes++;
+    else if (butsPour === butsContre) s.matchsNuls++;
+    s.butsMarques += butsPour;
+    s.butsEncaisses += butsContre;
     this.ecrire();
   },
 

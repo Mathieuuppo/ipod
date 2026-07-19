@@ -6,6 +6,7 @@
 // ============================================================
 
 import { sauvegarde } from './storage.js';
+import { dessinerBlason } from './data/equipes.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -13,8 +14,14 @@ export class UI {
   constructor() {
     this.ecrans = {
       titre: $('ecran-titre'),
+      menu: $('ecran-menu'),
       modes: $('ecran-modes'),
       difficulte: $('ecran-difficulte'),
+      equipe: $('ecran-equipe'),
+      compo: $('ecran-compo'),
+      competition: $('ecran-competition'),
+      stats: $('ecran-stats'),
+      reglages: $('ecran-reglages'),
       resultat: $('ecran-resultat'),
     };
     this.hudMatch = $('hud-match');
@@ -25,9 +32,15 @@ export class UI {
     this.btnPhoto = $('btn-photo');
     this.minuteurTexte = null;
 
-    this.dessinerDrapeaux();
     this.initTrace();
     this.initControlesArcade();
+  }
+
+  // Vibration légère (si l'appareil le permet et si le réglage est actif)
+  vibrer(duree) {
+    if (sauvegarde.donnees.reglages.vibrations && navigator.vibrate) {
+      navigator.vibrate(duree);
+    }
   }
 
   // ---------- Contrôles arcade : joystick + boutons d'action ----------
@@ -224,26 +237,42 @@ export class UI {
     $('score-match').textContent = `${scoreJoueur} - ${scoreAdverse}`;
   }
 
-  dessinerDrapeaux() {
-    // Drapeaux tricolores générés au canvas (équipe bleue vs équipe rouge)
-    const peindre = (id, couleurs) => {
-      const c = $(id).getContext('2d');
-      couleurs.forEach((coul, i) => {
-        c.fillStyle = coul;
-        c.fillRect(i * 14, 0, 14, 28);
-      });
-    };
-    peindre('drapeau-joueur', ['#2255cc', '#ffffff', '#2255cc']);
-    peindre('drapeau-adverse', ['#cc3333', '#ffffff', '#cc3333']);
+  // Blasons + noms des deux clubs dans le bandeau de match
+  majHudEquipes(equipeJoueur, equipeAdverse) {
+    dessinerBlason($('blason-joueur'), equipeJoueur);
+    dessinerBlason($('blason-adverse'), equipeAdverse);
+    $('nom-joueur').textContent = equipeJoueur.court;
+    $('nom-adverse').textContent = equipeAdverse.court;
   }
 
   // ---------- Écran de résultat de session ----------
 
-  montrerResultat({ titre, detail, etoiles }) {
+  // statsMatch (optionnel) : [{ libelle, joueur, adverse }] → jauges comparées
+  montrerResultat({ titre, detail, etoiles, statsMatch }) {
     $('resultat-titre').textContent = titre;
     $('resultat-detail').textContent = detail;
     $('resultat-etoiles').textContent =
       etoiles == null ? '' : '★'.repeat(etoiles) + '☆'.repeat(3 - etoiles);
+
+    const bloc = $('resultat-stats');
+    if (statsMatch && statsMatch.length) {
+      bloc.innerHTML = statsMatch.map(({ libelle, joueur, adverse }) => {
+        const total = joueur + adverse || 1;
+        return `<div class="stat-match">
+          <span>${joueur}</span>
+          <div>
+            <div class="libelle">${libelle}</div>
+            <div class="jauge">
+              <div class="part-joueur" style="width:${(joueur / total) * 100}%"></div>
+              <div class="part-adverse" style="width:${(adverse / total) * 100}%"></div>
+            </div>
+          </div>
+          <span>${adverse}</span>
+        </div>`;
+      }).join('');
+    } else {
+      bloc.innerHTML = '';
+    }
     this.montrerEcran('resultat');
   }
 

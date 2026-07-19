@@ -1,7 +1,23 @@
 /* ============================================================
-   Free Kick Champions — styles UI
-   Le rendu 3D est dans le canvas ; tout le reste est du DOM.
+   LUCARNE — styles UI
+   Identité : « soirée de match » — bleu nuit profond, or champion,
+   rappels vert pelouse. Typographie ultra-grasse italique façon
+   flocage de maillot. Le rendu 3D est dans le canvas ; tout le
+   reste est du DOM par-dessus.
    ============================================================ */
+
+:root {
+  --nuit: #0d1b2e;
+  --nuit-2: #14243f;
+  --nuit-3: #1d3355;
+  --or: #f5c542;
+  --or-sombre: #b8901f;
+  --pelouse: #37c837;
+  --pelouse-sombre: #1d8f1d;
+  --danger: #e33030;
+  --blanc: #f6f8fc;
+  --texte-doux: #9fb2cf;
+}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -9,13 +25,13 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #3fa9f5;
-  /* Bloque le scroll / zoom / double-tap du navigateur pendant le jeu */
-  touch-action: none;
+  background: var(--nuit);
+  touch-action: none;              /* bloque scroll / zoom navigateur */
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   font-family: "Arial Rounded MT Bold", "Trebuchet MS", Arial, sans-serif;
+  color: var(--blanc);
 }
 
 #conteneur-jeu, #conteneur-jeu canvas {
@@ -28,22 +44,410 @@ html, body {
 
 /* Ligne de trajectoire dessinée au doigt (entre le jeu et l'UI) */
 #canvas-trace {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  position: fixed; inset: 0;
+  width: 100%; height: 100%;
   pointer-events: none;
   z-index: 5;
 }
 
-/* La surcouche UI laisse passer les touches vers le canvas,
-   sauf sur ses éléments interactifs. */
 #ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
-#ui button, #ui .ecran { pointer-events: auto; }
+#ui button, #ui .ecran, #ui input { pointer-events: auto; }
 
 .cache { display: none !important; }
 
-/* ---------------- Bandeau de match (haut) ---------------- */
+/* ============================================================
+   Écrans & transitions
+   ============================================================ */
+
+.ecran {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(29, 51, 85, 0.92), rgba(13, 27, 46, 0.96)),
+    linear-gradient(180deg, rgba(13, 27, 46, 0.9), rgba(9, 18, 32, 0.96));
+  padding: calc(env(safe-area-inset-top, 0px) + 22px) 22px calc(env(safe-area-inset-bottom, 0px) + 22px);
+  text-align: center;
+  animation: ecran-entre 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes ecran-entre {
+  from { opacity: 0; transform: translateY(18px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ecran, #logo-ballon, .btn-principal { animation: none !important; }
+}
+
+/* Écrans à contenu défilant (listes d'équipes, effectif, stats…) */
+.ecran-liste { justify-content: flex-start; }
+.ecran-liste > h2 { flex-shrink: 0; }
+
+.ecran h2 {
+  font-size: 26px;
+  font-style: italic;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--or);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+}
+
+.titre-or { color: var(--or); font-weight: 900; font-style: italic; font-size: 20px; }
+.sous-texte { color: var(--texte-doux); font-size: 14px; }
+
+/* ---------------- Écran titre ---------------- */
+
+#logo-bloc { position: relative; }
+#logo-ballon {
+  font-size: 44px;
+  animation: ballon-rebond 1.6s ease-in-out infinite;
+  filter: drop-shadow(0 10px 6px rgba(0, 0, 0, 0.45));
+}
+@keyframes ballon-rebond {
+  0%, 100% { transform: translateY(0) rotate(-8deg); }
+  50% { transform: translateY(-22px) rotate(10deg); }
+}
+#logo {
+  font-size: 64px;
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: 2px;
+  background: linear-gradient(180deg, #ffe38a 20%, var(--or) 55%, var(--or-sombre));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(0, 0, 0, 0.6);
+  transform: rotate(-2.5deg);
+  text-shadow: none;
+  filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.5));
+}
+#logo-sous-titre {
+  letter-spacing: 6px;
+  font-size: 13px;
+  color: var(--texte-doux);
+  margin-top: 4px;
+}
+
+#stats-titre {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 10px 20px;
+  font-size: 15px;
+  line-height: 1.8;
+}
+#stats-titre b { color: var(--or); font-variant-numeric: tabular-nums; }
+
+/* ---------------- Boutons ---------------- */
+
+.btn-principal {
+  font-size: 24px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 2px;
+  padding: 15px 54px;
+  border-radius: 16px;
+  border: none;
+  background: linear-gradient(180deg, #ffe38a, var(--or) 45%, var(--or-sombre));
+  color: var(--nuit);
+  box-shadow: 0 6px 0 #7d6115, 0 12px 24px rgba(0, 0, 0, 0.35);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.btn-principal:active { transform: translateY(4px) scale(0.98); box-shadow: 0 2px 0 #7d6115; }
+.btn-principal.petit { font-size: 18px; padding: 12px 34px; }
+
+.btn-menu {
+  width: min(80vw, 330px);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 20px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--blanc);
+  padding: 15px 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.04));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  transition: transform 0.08s, background 0.15s;
+}
+.btn-menu span { font-size: 24px; font-style: normal; }
+.btn-menu:active { transform: scale(0.97); background: rgba(245, 197, 66, 0.18); }
+
+.btn-mode {
+  width: min(80vw, 330px);
+  font-size: 20px;
+  font-weight: 900;
+  font-style: italic;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, var(--nuit-3), var(--nuit-2));
+  color: var(--blanc);
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.4);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.btn-mode:active { transform: translateY(3px) scale(0.98); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4); }
+.btn-mode small { display: block; font-size: 13px; font-style: normal; color: var(--or); min-height: 15px; }
+
+.btn-retour, .btn-secondaire {
+  font-size: 16px;
+  font-weight: bold;
+  padding: 11px 22px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--blanc);
+  transition: transform 0.08s;
+}
+.btn-secondaire { border-color: var(--or); color: var(--or); }
+.btn-retour:active, .btn-secondaire:active, .btn-danger:active { transform: scale(0.95); }
+
+.btn-danger {
+  font-size: 15px;
+  font-weight: bold;
+  padding: 11px 22px;
+  border-radius: 12px;
+  border: 1px solid var(--danger);
+  background: rgba(227, 48, 48, 0.15);
+  color: #ff8a8a;
+}
+
+.barre-actions { display: flex; gap: 12px; flex-shrink: 0; }
+
+.entete-ecran {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+/* ---------------- Segments (onglets / réglages) ---------------- */
+
+.segments {
+  display: flex;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.segment {
+  border: none;
+  background: transparent;
+  color: var(--texte-doux);
+  font-weight: bold;
+  font-size: 15px;
+  padding: 8px 16px;
+  border-radius: 9px;
+  transition: background 0.15s, color 0.15s;
+}
+.segment.actif { background: var(--or); color: var(--nuit); }
+.segments.petits .segment { font-size: 13px; padding: 7px 10px; }
+
+/* ---------------- Sélection d'équipe ---------------- */
+
+#grille-equipes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: min(92vw, 380px);
+  overflow-y: auto;
+  padding: 4px;
+  flex: 1;
+  min-height: 0;
+}
+.carte-equipe {
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 10px 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: transform 0.08s, border-color 0.15s, background 0.15s;
+}
+.carte-equipe:active { transform: scale(0.95); }
+.carte-equipe.choisie { border-color: var(--or); background: rgba(245, 197, 66, 0.14); }
+.carte-equipe canvas { width: 44px; height: 49px; }
+.carte-equipe .nom { font-size: 11.5px; font-weight: bold; line-height: 1.15; }
+.carte-equipe .note { font-size: 11px; color: var(--or); }
+
+#perso-bloc {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+#perso-bloc label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--texte-doux);
+}
+#perso-bloc input {
+  width: 140px;
+  padding: 9px 10px;
+  font-size: 15px;
+  font-weight: bold;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--blanc);
+  text-align: center;
+}
+#perso-bloc input#perso-numero { width: 74px; }
+
+/* ---------------- Composition & tactique ---------------- */
+
+#tactique-bloc {
+  width: min(92vw, 380px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.tactique-ligne {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.tactique-ligne > span { font-size: 14px; font-weight: bold; color: var(--texte-doux); }
+
+#liste-effectif, #liste-stats, #liste-reglages {
+  width: min(92vw, 380px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+  padding: 2px;
+}
+#liste-reglages { flex: initial; }
+
+.ligne-joueur {
+  display: grid;
+  grid-template-columns: 30px 1fr 96px;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 7px 10px;
+  text-align: left;
+}
+.ligne-joueur.remplacant { opacity: 0.55; }
+.ligne-joueur .numero {
+  font-weight: 900;
+  font-style: italic;
+  color: var(--or);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.ligne-joueur .infos { line-height: 1.2; }
+.ligne-joueur .infos .nom { font-size: 13.5px; font-weight: bold; }
+.ligne-joueur .infos .poste { font-size: 11px; color: var(--texte-doux); }
+.ligne-joueur .barres { display: flex; flex-direction: column; gap: 3px; }
+.barre-stat {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.barre-stat > div {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--pelouse-sombre), var(--pelouse));
+}
+.barre-stat.or > div { background: linear-gradient(90deg, var(--or-sombre), var(--or)); }
+
+/* ---------------- Bracket de compétition ---------------- */
+
+#bracket {
+  width: min(92vw, 380px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+.tour-titre {
+  font-size: 13px;
+  letter-spacing: 3px;
+  color: var(--texte-doux);
+  text-transform: uppercase;
+}
+.duel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+.duel.mien { border: 1.5px solid var(--or); }
+.duel .camp { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: bold; }
+.duel canvas { width: 26px; height: 29px; }
+.duel .score-duel { font-weight: 900; color: var(--or); font-variant-numeric: tabular-nums; }
+.duel .gagnant { color: var(--pelouse); }
+
+/* ---------------- Statistiques & réglages ---------------- */
+
+.ligne-stat {
+  display: flex;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14.5px;
+}
+.ligne-stat b { color: var(--or); font-variant-numeric: tabular-nums; }
+
+/* ---------------- Écran de résultat ---------------- */
+
+#resultat-titre { font-size: 34px; }
+#resultat-detail { font-size: 19px; line-height: 1.7; white-space: pre-line; }
+#resultat-etoiles { font-size: 40px; letter-spacing: 6px; color: var(--or); }
+#resultat-stats {
+  width: min(88vw, 340px);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.stat-match {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+.stat-match .libelle { color: var(--texte-doux); font-size: 12px; font-weight: normal; }
+.stat-match .jauge {
+  height: 6px;
+  display: flex;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+.stat-match .jauge .part-joueur { background: var(--or); }
+.stat-match .jauge .part-adverse { background: #b04a4a; }
+
+/* ============================================================
+   Éléments en jeu (HUD, contrôles)
+   ============================================================ */
+
 #hud-match {
   position: absolute;
   top: calc(env(safe-area-inset-top, 0px) + 8px);
@@ -51,29 +455,28 @@ html, body {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: rgba(20, 40, 70, 0.75);
+  gap: 12px;
+  background: rgba(9, 18, 32, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
   padding: 6px 14px;
-  color: #fff;
 }
-#hud-match .equipe { display: flex; align-items: center; gap: 6px; font-weight: bold; }
-#hud-match .drapeau { width: 30px; height: 20px; border-radius: 3px; border: 1px solid #fff; }
+#hud-match .equipe { display: flex; align-items: center; gap: 6px; font-weight: 900; font-style: italic; }
 #cadre-central { text-align: center; }
-#score-match { font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+#score-match { font-size: 21px; font-weight: 900; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
 #minuteur {
-  background: #fff; color: #123; border-radius: 8px;
-  font-size: 13px; font-weight: bold; padding: 1px 8px; margin-top: 2px;
+  background: var(--or); color: var(--nuit); border-radius: 8px;
+  font-size: 13px; font-weight: 900; padding: 1px 8px; margin-top: 2px;
+  font-variant-numeric: tabular-nums;
 }
 
-/* ---------------- Compteur de tirs ---------------- */
 #hud-tirs {
   position: absolute;
   top: calc(env(safe-area-inset-top, 0px) + 10px);
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(20, 40, 70, 0.75);
-  color: #fff;
+  background: rgba(9, 18, 32, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   padding: 6px 16px;
   font-size: 16px;
@@ -83,7 +486,6 @@ html, body {
   white-space: pre-line;
 }
 
-/* ---------------- Texte cartoon jaune ---------------- */
 #instruction, #message-resultat {
   position: absolute;
   left: 50%;
@@ -97,11 +499,10 @@ html, body {
   pointer-events: none;
 }
 #instruction { bottom: 22%; font-size: 26px; animation: pulser 1s ease-in-out infinite; }
-#message-resultat { top: 34%; font-size: 44px; animation: apparaitre 0.25s ease-out; }
+#message-resultat { top: 34%; font-size: 44px; animation: apparaitre 0.25s ease-out; z-index: 20; }
 @keyframes pulser { 50% { transform: translateX(-50%) scale(1.08); } }
 @keyframes apparaitre { from { transform: translateX(-50%) scale(0.2); } to { transform: translateX(-50%) scale(1); } }
 
-/* ---------------- Boutons en jeu ---------------- */
 #btn-quitter {
   position: absolute;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
@@ -109,10 +510,11 @@ html, body {
   width: 52px; height: 52px;
   border-radius: 50%;
   border: 3px solid #fff;
-  background: #e33030;
+  background: var(--danger);
   color: #fff;
   font-size: 22px;
   font-weight: bold;
+  z-index: 15;
 }
 #btn-photo {
   position: absolute;
@@ -120,88 +522,14 @@ html, body {
   right: 12px;
   width: 46px; height: 46px;
   border-radius: 12px;
-  border: 2px solid #fff;
-  background: rgba(20, 40, 70, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(9, 18, 32, 0.82);
   font-size: 20px;
 }
 #btn-quitter:active, #btn-photo:active { transform: scale(0.92); }
 
-/* ---------------- Écrans (menus) ---------------- */
-.ecran {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  background: linear-gradient(180deg, rgba(25, 60, 130, 0.88), rgba(10, 25, 60, 0.94));
-  color: #fff;
-  padding: 24px;
-  text-align: center;
-}
-.ecran h2 { font-size: 30px; -webkit-text-stroke: 1px #000; }
-
-#logo {
-  font-size: 44px;
-  line-height: 1.05;
-  color: #ffe000;
-  -webkit-text-stroke: 2px #000;
-  paint-order: stroke fill;
-  text-shadow: 4px 4px 0 #000;
-  transform: rotate(-3deg);
-}
-#logo span { color: #fff; font-size: 34px; }
-
-#stats-titre {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  padding: 10px 18px;
-  font-size: 16px;
-  line-height: 1.7;
-}
-
-.btn-principal {
-  font-size: 26px;
-  font-weight: 900;
-  padding: 14px 52px;
-  border-radius: 16px;
-  border: 4px solid #fff;
-  background: linear-gradient(180deg, #37c837, #1d8f1d);
-  color: #fff;
-  text-shadow: 2px 2px 0 rgba(0,0,0,0.4);
-  box-shadow: 0 6px 0 #0d5c0d;
-}
-.btn-principal:active { transform: translateY(4px); box-shadow: 0 2px 0 #0d5c0d; }
-
-.btn-mode {
-  width: min(78vw, 320px);
-  font-size: 21px;
-  font-weight: bold;
-  padding: 14px;
-  border-radius: 14px;
-  border: 3px solid #fff;
-  background: linear-gradient(180deg, #3f7fe0, #245bb0);
-  color: #fff;
-  box-shadow: 0 5px 0 #163d78;
-}
-.btn-mode:active { transform: translateY(3px); box-shadow: 0 2px 0 #163d78; }
-.btn-mode small { display: block; font-size: 14px; color: #ffe000; min-height: 16px; }
-
-.btn-retour {
-  font-size: 16px;
-  padding: 10px 22px;
-  border-radius: 12px;
-  border: 2px solid #fff;
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
-  margin-top: 8px;
-}
-
-#resultat-detail { font-size: 20px; line-height: 1.8; white-space: pre-line; }
-#resultat-etoiles { font-size: 42px; letter-spacing: 6px; }
-
 /* ---------------- Mini-jeu de timing ---------------- */
+
 #minijeu-timing {
   position: absolute;
   bottom: 20%;
@@ -224,10 +552,7 @@ html, body {
   border-radius: 13px;
   overflow: hidden;
 }
-#timing-zone {
-  position: absolute; top: 0; bottom: 0;
-  background: #37c837;
-}
+#timing-zone { position: absolute; top: 0; bottom: 0; background: var(--pelouse); }
 #timing-curseur {
   position: absolute; top: -2px; bottom: -2px;
   width: 8px;
@@ -237,6 +562,7 @@ html, body {
 }
 
 /* ---------------- Contrôles du mode arcade ---------------- */
+
 #controles-arcade { position: absolute; inset: 0; pointer-events: none; }
 
 #joystick {
@@ -245,8 +571,8 @@ html, body {
   left: 22px;
   width: 128px; height: 128px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.14);
-  border: 3px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.10);
+  border: 3px solid rgba(255, 255, 255, 0.45);
   pointer-events: auto;
   touch-action: none;
 }
@@ -258,7 +584,7 @@ html, body {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.75);
   border: 2px solid #fff;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
 }
 
 #boutons-arcade {
@@ -275,23 +601,26 @@ html, body {
   border-radius: 50%;
   border: 3px solid #fff;
   color: #fff;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 900;
-  text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+  font-style: italic;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
   touch-action: none;
+  transition: transform 0.08s;
 }
 #btn-action-passe { background: rgba(34, 85, 204, 0.85); }
-#btn-action-tir { background: rgba(227, 48, 48, 0.85); box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
+#btn-action-tir { background: rgba(227, 48, 48, 0.85); box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3); }
 #boutons-arcade button:active { transform: scale(0.92); }
 
+.blason-hud { width: 26px; height: 29px; }
+
 /* ---------------- Confettis ---------------- */
-#confettis { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+
+#confettis { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 18; }
 .confetti {
   position: absolute;
   width: 10px; height: 14px;
   top: -20px;
   animation: chute linear forwards;
 }
-@keyframes chute {
-  to { transform: translateY(110vh) rotate(720deg); }
-}
+@keyframes chute { to { transform: translateY(110vh) rotate(720deg); } }

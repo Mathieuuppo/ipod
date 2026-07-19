@@ -150,8 +150,46 @@ export function creerFigurine({ maillot = 0x2255cc, short = 0xffffff, peau = 0xf
   cheveuxM.position.y = 1.46;
 
   grp.add(jambeG, jambeD, shortM, torse, brasG, brasD, tete, cheveuxM);
-  grp.userData = { jambeG, jambeD, brasG, brasD, tete };
+  grp.userData = { jambeG, jambeD, brasG, brasD, tete, torse, shortM };
   return grp;
+}
+
+// Change les couleurs de maillot / short d'une figurine existante.
+// (brasD partage le matériau de brasG : une seule mise à jour suffit.)
+export function colorierFigurine(fig, maillot, short) {
+  fig.userData.torse.material.color.set(maillot);
+  fig.userData.brasG.material.color.set(maillot);
+  fig.userData.shortM.material.color.set(short);
+}
+
+// Ajoute (ou met à jour) le numéro floqué dans le dos d'une figurine
+export function floquerNumero(fig, numero) {
+  if (!fig.userData.numeroCanvas) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64; canvas.height = 64;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const plaque = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.3, 0.3),
+      new THREE.MeshBasicMaterial({ map: texture, transparent: true })
+    );
+    plaque.position.set(0, 0.86, -0.135);
+    plaque.rotation.y = Math.PI; // tournée vers le dos
+    fig.add(plaque);
+    fig.userData.numeroCanvas = canvas;
+    fig.userData.numeroTexture = texture;
+  }
+  const g = fig.userData.numeroCanvas.getContext('2d');
+  g.clearRect(0, 0, 64, 64);
+  g.font = '900 44px Arial';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.lineWidth = 6;
+  g.strokeStyle = 'rgba(0,0,0,0.6)';
+  g.strokeText(String(numero), 32, 34);
+  g.fillStyle = '#ffffff';
+  g.fillText(String(numero), 32, 34);
+  fig.userData.numeroTexture.needsUpdate = true;
 }
 
 // ---------- Le monde ----------
@@ -464,6 +502,19 @@ export class Monde {
     };
     this.montrerActeursArcade(false);
     return this.arcade;
+  }
+
+  // Habille les deux équipes arcade aux couleurs de leurs clubs
+  colorierEquipesArcade(equipeJoueur, equipeAdverse) {
+    if (!this.arcade) return;
+    for (const j of this.arcade.bleu) colorierFigurine(j, equipeJoueur.couleur1, equipeJoueur.couleur2);
+    for (const j of this.arcade.rouge) colorierFigurine(j, equipeAdverse.couleur1, equipeAdverse.couleur2);
+  }
+
+  // Habille le tireur des modes de tir (couleurs du club + numéro au dos)
+  personnaliserTireur(equipe, numero) {
+    colorierFigurine(this.tireur, equipe.couleur1, equipe.couleur2);
+    floquerNumero(this.tireur, numero);
   }
 
   montrerActeursArcade(visible) {

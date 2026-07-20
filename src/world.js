@@ -90,6 +90,25 @@ function textureBallon() {
   return t;
 }
 
+function texturePub(texte) {
+  // Panneau publicitaire de bord de terrain avec texte répété (façon
+  // "CHAMPION" des stades de référence) — aucune image externe.
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#14243f';
+  g.fillRect(0, 0, 512, 64);
+  g.fillStyle = '#f5c542';
+  g.font = '900 38px Arial';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(texte, 256, 34);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 function textureFilet() {
   // Grille blanche semi-transparente pour le filet
   const c = document.createElement('canvas');
@@ -219,6 +238,7 @@ export class Monde {
     this.construireCage(0, 0);                  // cage A (tirs)
     this.construireCage(TERRAIN.longueur, Math.PI); // cage B (arcade)
     this.construireTribunes();
+    this.construireFigurants();
     this.construireActeurs();
     this.construireFleche();
 
@@ -407,10 +427,14 @@ export class Monde {
       this.scene.add(lampe);
     }
 
-    // Panneaux publicitaires autour du terrain
-    const matPub = new THREE.MeshLambertMaterial({ color: 0x2a6fd6 });
+    // Panneaux publicitaires texturés autour du terrain (texte répété)
+    const textePub = ['LUCARNE', 'CHAMPION'];
+    let iPub = 0;
     const pub = (l, x, z, rot) => {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(l, 0.9, 0.2), matPub);
+      const tex = texturePub(textePub[iPub++ % textePub.length]);
+      tex.repeat.set(Math.max(1, Math.round(l / 7.5)), 1);
+      const mat = new THREE.MeshLambertMaterial({ map: tex });
+      const p = new THREE.Mesh(new THREE.BoxGeometry(l, 0.9, 0.2), mat);
       p.position.set(x, 0.45, z);
       p.rotation.y = rot;
       this.scene.add(p);
@@ -419,6 +443,40 @@ export class Monde {
     pub(D * 2 + 8, 0, L + 4.2, 0);
     pub(L + 6, D + 4, L / 2, Math.PI / 2);
     pub(L + 6, -(D + 4), L / 2, Math.PI / 2);
+  }
+
+  // Petits figurants de bord de terrain (photographes/staff) pour
+  // l'ambiance — statiques, façon caméramans de bord de pelouse.
+  construireFigurants() {
+    const L = TERRAIN.longueur, D = TERRAIN.demiLargeur;
+    const matCorps = new THREE.MeshLambertMaterial({ color: 0x24262b });
+    const matPeau = new THREE.MeshLambertMaterial({ color: 0xdba876 });
+    const matCamera = new THREE.MeshLambertMaterial({ color: 0x101114 });
+
+    const positions = [];
+    for (const [z, rot] of [[-2.2, 0], [L + 2.2, Math.PI]]) {
+      for (const x of [-D * 0.55, -D * 0.18, D * 0.18, D * 0.55]) positions.push([x, z, rot]);
+    }
+    for (const x of [-(D + 2.6), D + 2.6]) {
+      const rot = x < 0 ? Math.PI / 2 : -Math.PI / 2;
+      positions.push([x, 7, rot], [x, L - 7, rot]);
+    }
+
+    for (const [x, z, rot] of positions) {
+      const grp = new THREE.Group();
+      const jambes = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.7, 0.22), matCorps);
+      jambes.position.y = 0.35;
+      const torse = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.4, 0.24), matCorps);
+      torse.position.y = 0.9;
+      const tete = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.24), matPeau);
+      tete.position.y = 1.22;
+      const camera = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.16, 0.42), matCamera);
+      camera.position.set(0.24, 1.05, 0.05);
+      grp.add(jambes, torse, tete, camera);
+      grp.position.set(x, 0, z);
+      grp.rotation.y = rot;
+      this.scene.add(grp);
+    }
   }
 
   construireActeurs() {
@@ -536,15 +594,21 @@ export class Monde {
     this.fleche.visible = false;
   }
 
-  // Caméra "FIFA vue de haut" : au-dessus du ballon, inclinée vers
-  // l'avant, avec un lissage pour suivre l'action sans à-coups.
-  // Un peu plus haute pour lire le jeu à 11 contre 11.
-  suivreCameraArcade(cibleX, cibleZ, dt) {
-    const zVue = clamp(cibleZ, 7, TERRAIN.longueur - 7);
-    const posVoulue = new THREE.Vector3(cibleX * 0.45, 28, zVue + 14);
-    const k = Math.min(dt * 4, 1);
+  // Caméra dynamique de bord de terrain, basse et rapprochée (façon
+  // diffusion arcade) : elle se place DERRIÈRE l'équipe qui attaque et
+  // regarde au-delà du ballon, vers le but visé. Elle pivote en douceur
+  // au changement de possession, comme une caméra de stade qui suit le jeu.
+  // dirAttaque : -1 si l'équipe qui a le ballon attaque vers z=0, +1 vers z=L.
+  suivreCameraArcade(cibleX, cibleZ, dirAttaque, dt) {
+    if (this.camDirLisse === undefined) this.camDirLisse = dirAttaque;
+    this.camDirLisse += (dirAttaque - this.camDirLisse) * Math.min(dt * 1.1, 1);
+
+    const zVue = clamp(cibleZ, 8, TERRAIN.longueur - 8);
+    const hauteur = 11.5, recul = 12.5;
+    const posVoulue = new THREE.Vector3(cibleX * 0.55, hauteur, zVue - this.camDirLisse * recul);
+    const k = Math.min(dt * 3.2, 1);
     this.camera.position.lerp(posVoulue, k);
-    this.cibleCamera = new THREE.Vector3(cibleX * 0.6, 0, zVue - 3);
+    this.cibleCamera = new THREE.Vector3(cibleX * 0.7, 0.6, zVue + this.camDirLisse * 9);
     this.camera.lookAt(this.cibleCamera);
   }
 
@@ -698,7 +762,9 @@ export class Monde {
     const w = window.innerWidth, h = window.innerHeight;
     this.camera.aspect = w / h;
     // Sur écran très étroit (portrait), on élargit le champ vertical
-    this.camera.fov = h > w ? 62 : 50;
+    // (un peu plus large qu'avant : la caméra arcade est désormais plus
+    // basse et rapprochée, il faut plus de champ pour lire le jeu)
+    this.camera.fov = h > w ? 68 : 54;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
   }

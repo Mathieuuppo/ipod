@@ -23,6 +23,7 @@ import { TERRAIN } from '../world.js';
 import { sauvegarde } from '../storage.js';
 import { sons } from '../audio.js';
 import { statsEquipe } from '../data/equipes.js';
+import { SequenceTir } from '../shot.js';
 
 const L = TERRAIN.longueur;
 const DEMI = TERRAIN.demiLargeur;
@@ -169,7 +170,9 @@ export class ModeArcade {
     this.scoreAdverse = 0;
     this.tempsEcoule = 0;
     this.minute = 0;
-    this.etat = 'jeu';        // jeu | pause (but) | remise (touche/corner/6m) | fini
+    this.etat = 'jeu';        // jeu | pause (but) | remise (touche/corner/6m) | replay | fini
+    this.phaseMatch = 'reglementaire'; // reglementaire | prolongation | tab
+    this.resultatTAB = null;
     this.tempsPause = 0;
     this.remise = null;       // { equipe, x, z, type }
     this.decisionIA = 1.0;    // minuteur de décision du porteur adverse
@@ -364,12 +367,24 @@ export class ModeArcade {
       return;
     }
 
+    // Séance de tirs au but : boucle dédiée, indépendante du ballon/IA
+    if (this.phaseMatch === 'tab') {
+      this.majTAB(dt);
+      return;
+    }
+
     this.tempsEcoule += dt;
-    const minute = Math.min(90, Math.floor(this.tempsEcoule / CONFIG.arcadeSecondesParMinute));
+    const minute = this.phaseMatch === 'prolongation'
+      ? Math.min(120, 90 + Math.floor((this.tempsEcoule - this.tempsEcouleBase) / CONFIG.arcadeSecondesParMinute))
+      : Math.min(90, Math.floor(this.tempsEcoule / CONFIG.arcadeSecondesParMinute));
     if (minute !== this.minute) {
       this.minute = minute;
       ui.majMatch({ minute, scoreJoueur: this.scoreJoueur, scoreAdverse: this.scoreAdverse });
-      if (minute >= 90) { this.terminer(); return; }
+      if ((this.phaseMatch === 'reglementaire' && minute >= 90) ||
+          (this.phaseMatch === 'prolongation' && minute >= 120)) {
+        this.verifierFinDeTemps();
+        return;
+      }
     }
 
     this.cooldownTacle = Math.max(0, this.cooldownTacle - dt);
@@ -418,7 +433,9 @@ export class ModeArcade {
       arc.anneauPorteur.visible = false;
     }
     ui.libellesArcade(!!(this.porteur && this.porteur.equipe === 'bleu'));
-    monde.suivreCameraArcade(this.ballon.x, this.ballon.z, dt);
+    // Caméra dynamique : derrière l'équipe qui a touché le ballon en dernier
+    const dirCam = this.dernierToucheur === 'bleu' ? -1 : 1;
+    monde.suivreCameraArcade(this.ballon.x, this.ballon.z, dirCam, dt);
   }
 
   // ---------- Replay de but ----------
@@ -515,6 +532,27 @@ export class ModeArcade {
       ? this.plusProche(joueurs.filter((j) => j !== porteurAmi && j !== this.controle), porteurAmi.x, porteurAmi.z)
       : null;
 
+    // Marquage : quand le ballon est profond dans notre moitié, un
+    // défenseur supplémentaire vient se placer entre l'attaquant adverse
+    // le plus dangereux et notre but — il coupe la ligne de passe au lieu
+    // de coller bêtement au corps à corps.
+    const enDanger = !enRemise && (equipe === 'bleu' ? this.ballon.z < 22 : this.ballon.z > L - 22);
+    let cibleMarquage = null, marqueur = null;
+    if (enDanger) {
+      const adversaires = equipe === 'bleu' ? this.rouges : this.bleus;
+      let meilleurScoreCible = -1e9;
+      for (const a of adversaires) {
+        if (a === porteurAdverse) continue;
+        const distBut = equipe === 'bleu' ? a.z : (L - a.z);
+        if (-distBut > meilleurScoreCible) { meilleurScoreCible = -distBut; cibleMarquage = a; }
+      }
+      if (cibleMarquage) {
+        marqueur = this.plusProche(
+          joueurs.filter((j) => j !== presseur && j !== chasseur && j !== this.controle),
+          cibleMarquage.x, cibleMarquage.z);
+      }
+    }
+
     for (const j of joueurs) {
       if (j === this.porteur) continue;
       if (equipe === 'bleu' && j === this.controle) continue; // piloté par le joystick
@@ -553,6 +591,14 @@ export class ModeArcade {
           clamp(porteurAmi.x + cote * 5, -DEMI + 1.5, DEMI - 1.5),
           clamp(porteurAmi.z - dirAtt * 3, 2, L - 2),
           vitesseBase * 0.85, dt);
+        continue;
+      }
+      if (marqueur && j === marqueur) {
+        // Se place côté but, entre l'attaquant adverse et sa cible
+        const versBut = equipe === 'bleu' ? 1 : -1;
+        const tx = clamp(cibleMarquage.x, -DEMI + 1, DEMI - 1);
+        const tz = clamp(cibleMarquage.z + versBut * 1.5, 2.5, L - 2.5);
+        j.chercher(tx, tz, vitesseBase * 0.88, dt);
         continue;
       }
       if (porteurAmi && forme.attaquants.includes(j.indice)) {
@@ -594,6 +640,10 @@ export class ModeArcade {
     const p = this.porteur && this.porteur.equipe === 'rouge' ? this.porteur : null;
     if (!p) return;
     const pression = this.controle.dist(p.x, p.z) < 3;
+    // Rouge défend la cage A (z=0) : ses défenseurs (indices 0-3 du 4-4-2)
+    // pressés près de leur propre surface dégagent au lieu de dribbler.
+    const estDefenseur = p.indice <= 3;
+    const zoneDangereuse = p.z < 16;
 
     // Il avance doucement s'il est seul, accélère sous pression
     p.chercher(p.x * 0.75, L - 3, this.vIA * (pression ? 0.95 : 0.6), dt);
@@ -601,6 +651,15 @@ export class ModeArcade {
     this.decisionIA -= dt;
     if (this.decisionIA > 0) return;
     this.decisionIA = 1.1;
+
+    if (estDefenseur && zoneDangereuse && pression) {
+      // Dégagement : long et large, loin du danger, plutôt qu'un pari
+      const cote = p.x >= 0 ? 1 : -1;
+      const cibleX = clamp(p.x + cote * alea(6, 11), -DEMI + 2, DEMI - 2);
+      this.frapper(p, cibleX - p.x, alea(14, 20), CONFIG.arcadeVitesseTir * 0.85, alea(3.5, 5.5));
+      sons.frappe();
+      return;
+    }
 
     const distBut = L - p.z;
     if (distBut < 13 && Math.random() < 0.55) {
@@ -841,14 +900,170 @@ export class ModeArcade {
     }
   }
 
+  // ---------- Prolongation ----------
+
+  // Appelé à 90' puis à 120' : en cas d'égalité, le match se prolonge
+  // au lieu de s'arrêter — même en match amical, comme dans un vrai match.
+  verifierFinDeTemps() {
+    const { ui } = this.ctx;
+    if (this.scoreJoueur !== this.scoreAdverse) { this.terminer(); return; }
+    if (this.phaseMatch === 'reglementaire') {
+      this.phaseMatch = 'prolongation';
+      this.tempsEcouleBase = this.tempsEcoule;
+      sons.sifflet();
+      ui.montrerMessage('MATCH NUL — PROLONGATION !', 2200);
+      this.prochainEngagement = Math.random() < 0.5 ? 'bleu' : 'rouge';
+      this.etat = 'pause';
+      this.tempsPause = 2.2;
+    } else {
+      this.demarrerTirsAuBut();
+    }
+  }
+
+  // ---------- Séance de tirs au but ----------
+
+  demarrerTirsAuBut() {
+    const { monde, gardien, ui } = this.ctx;
+    this.phaseMatch = 'tab';
+    this.tabJoueur = [];
+    this.tabIA = [];
+    this.tabSequence = null;
+    this.tabTourJoueur = Math.random() < 0.5;
+    this.tabPhase = 'attente';
+    this.tempsPause = 2.2;
+
+    ui.montrerControlesArcade(false);
+    ui.montrerHudMatch(true);
+    ui.montrerHudTirs(this.tableauTAB());
+    monde.modeArcade(false); // bascule vers le décor de tir (tireur/gardien/cage)
+    monde.personnaliserTireur(this.equipeJoueur, sauvegarde.donnees.perso.numero);
+    monde.placerPenalty();
+    gardien.reinitialiser();
+    sons.sifflet();
+    ui.montrerMessage('TOUJOURS À ÉGALITÉ — TIRS AU BUT !', 2400);
+  }
+
+  tableauTAB() {
+    const ligne = (tirs) => tirs.map((b) => (b ? '●' : '○')).join(' ') || '·';
+    return `TOI  ${ligne(this.tabJoueur)}\nIA   ${ligne(this.tabIA)}`;
+  }
+
+  majTAB(dt) {
+    const { gardien, ui } = this.ctx;
+
+    if (this.tabPhase === 'attente') {
+      this.tempsPause -= dt;
+      if (this.tempsPause <= 0) {
+        if (this.tabTourJoueur) this.lancerTirJoueurTAB();
+        else this.lancerTirIATAB();
+      }
+      return;
+    }
+
+    if (this.tabPhase === 'vol') {
+      gardien.maj(dt);
+      if (!this.tabSequence) return; // joueur : en attente du geste de tir
+      const resultat = this.tabSequence.maj(dt);
+      if (resultat) {
+        const but = resultat === 'but';
+        (this.tabTourJoueur ? this.tabJoueur : this.tabIA).push(but);
+        if (this.tabTourJoueur) sauvegarde.enregistrerPenalty(but);
+        this.jouerSonTAB(resultat);
+        ui.montrerHudTirs(this.tableauTAB());
+        this.tabSequence = null;
+        if (this.verifierFinTAB()) return;
+        this.tabTourJoueur = !this.tabTourJoueur;
+        this.tabPhase = 'attente';
+        this.tempsPause = 1.6;
+      }
+    }
+  }
+
+  lancerTirJoueurTAB() {
+    const { monde, gardien, ui, swipe } = this.ctx;
+    this.tabPhase = 'vol';
+    monde.placerPenalty();
+    gardien.reinitialiser();
+    ui.montrerInstruction('Tir au but ! Trace ta trajectoire !');
+    swipe.actif = true;
+    swipe.surProgression = (points) => {
+      ui.dessinerTrace(points);
+      const dernier = points[points.length - 1];
+      monde.majFleche(monde.cibleDepuisEcran(dernier.x, dernier.y));
+    };
+    swipe.surTir = (geste) => {
+      swipe.actif = false;
+      ui.montrerInstruction(null);
+      ui.effacerTrace();
+      monde.majFleche(null);
+      monde.animerFrappe();
+      sons.frappe();
+      const cible = monde.cibleDepuisEcran(geste.finX, geste.finY);
+      this.tabSequence = new SequenceTir(monde, gardien, this.ctx.difficulte, false);
+      this.tabSequence.surEvenement = (type) => this.jouerSonTAB(type);
+      this.tabSequence.lancer({ cible, puissance: geste.puissance, spin: geste.spin });
+    };
+  }
+
+  lancerTirIATAB() {
+    const { monde, gardien } = this.ctx;
+    this.tabPhase = 'vol';
+    monde.placerPenalty();
+    gardien.reinitialiser();
+    monde.animerFrappe();
+    sons.frappe();
+    const cote = Math.random() < 0.5 ? -1 : 1;
+    this.tabSequence = new SequenceTir(monde, gardien, this.ctx.difficulte, false);
+    this.tabSequence.surEvenement = (type) => this.jouerSonTAB(type);
+    if (Math.random() < this.reglages.iaChanceButPenalty) {
+      // Tir cadré : au ras du poteau, à l'opposé de la plongée du gardien
+      this.tabSequence.lancer(
+        { cible: { x: cote * 3.1, y: alea(0.4, 1.9) }, puissance: 23, spin: 0 },
+        { x: -cote * 2.4, y: 1 });
+    } else {
+      // Raté : au-dessus ou nettement à côté
+      this.tabSequence.lancer({ cible: { x: cote * alea(4, 6.4), y: alea(0.3, 3.6) }, puissance: 24, spin: 0 });
+    }
+  }
+
+  jouerSonTAB(type) {
+    const { ui } = this.ctx;
+    if (type === 'but') { sons.but(); ui.lancerConfettis(); }
+    else if (type === 'poteau') sons.poteau();
+    else if (type === 'arret') sons.arret();
+    else sons.rate();
+  }
+
+  // Règles de la séance : 5 tirs chacun, puis mort subite si égalité
+  verifierFinTAB() {
+    const bJ = this.tabJoueur.filter(Boolean).length;
+    const bIA = this.tabIA.filter(Boolean).length;
+    const nJ = this.tabJoueur.length, nIA = this.tabIA.length;
+    const N = CONFIG.tirsSeance;
+    let fini = false;
+    if (nJ <= N && nIA <= N) {
+      const resteJ = N - nJ, resteIA = N - nIA;
+      if (bJ > bIA + resteIA || bIA > bJ + resteJ) fini = true;
+      if (nJ === N && nIA === N && bJ !== bIA) fini = true;
+    }
+    if (nJ > N && nJ === nIA && bJ !== bIA) fini = true;
+    if (fini) {
+      this.resultatTAB = { bJ, bIA };
+      this.ctx.ui.montrerHudTirs(null);
+      this.terminer();
+    }
+    return fini;
+  }
+
   terminer() {
     const { ui, difficulte, surFin } = this.ctx;
     this.etat = 'fini';
     sons.sifflet();
 
     const diff = this.scoreJoueur - this.scoreAdverse;
-    const victoire = diff > 0, nul = diff === 0;
-    const etoiles = victoire ? (diff >= 2 ? 3 : 2) : nul ? 1 : 0;
+    const victoire = this.resultatTAB ? this.resultatTAB.bJ > this.resultatTAB.bIA : diff > 0;
+    const nul = !this.resultatTAB && diff === 0;
+    const etoiles = victoire ? (diff >= 2 && !this.resultatTAB ? 3 : 2) : nul ? 1 : 0;
     sauvegarde.enregistrerEtoiles(this.nom, difficulte, etoiles);
     sauvegarde.enregistrerMatch(this.scoreJoueur, this.scoreAdverse);
 
@@ -861,13 +1076,19 @@ export class ModeArcade {
       { libelle: 'Tirs cadrés', joueur: this.statsMatch.cadres[0], adverse: this.statsMatch.cadres[1] },
     ];
 
-    // Le score est transmis à main.js (utile pour la Coupe Lucarne)
-    this.ctx.dernierScore = { joueur: this.scoreJoueur, adverse: this.scoreAdverse };
+    // Le score est transmis à main.js (utile pour la Coupe Lucarne) : en
+    // cas de tirs au but, on ajoute le but décisif pour donner un score final
+    this.ctx.dernierScore = this.resultatTAB
+      ? { joueur: this.scoreJoueur + (victoire ? 1 : 0), adverse: this.scoreAdverse + (victoire ? 0 : 1) }
+      : { joueur: this.scoreJoueur, adverse: this.scoreAdverse };
+
+    const suffixePhase = this.phaseMatch === 'prolongation' ? ' (a.p.)'
+      : this.resultatTAB ? ` (tab ${this.resultatTAB.bJ}-${this.resultatTAB.bIA})` : '';
 
     this.nettoyer();
     ui.montrerResultat({
       titre: victoire ? 'VICTOIRE ! 🏆' : nul ? 'Match nul' : 'Défaite…',
-      detail: `${this.equipeJoueur.court}  ${this.scoreJoueur} - ${this.scoreAdverse}  ${this.equipeAdverse.court}`,
+      detail: `${this.equipeJoueur.court}  ${this.scoreJoueur} - ${this.scoreAdverse}  ${this.equipeAdverse.court}${suffixePhase}`,
       etoiles,
       statsMatch,
     });
@@ -875,11 +1096,17 @@ export class ModeArcade {
   }
 
   nettoyer() {
-    const { ui, monde } = this.ctx;
+    const { ui, monde, swipe } = this.ctx;
     ui.montrerControlesArcade(false);
     ui.montrerHudMatch(false);
+    ui.montrerHudTirs(null);
+    ui.montrerInstruction(null);
+    ui.effacerTrace();
     ui.surPasse = null;
     ui.surTirArcade = null;
+    swipe.actif = false;
+    swipe.surTir = null;
+    swipe.surProgression = null;
     monde.modeArcade(false);
     monde.placerCoupFranc(18, 0, 4); // restaure le décor et la caméra des menus
   }

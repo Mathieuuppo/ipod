@@ -472,7 +472,9 @@ html, body {
 
 #hud-tirs {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  /* Placé sous #hud-match : les deux peuvent être visibles ensemble
+     pendant une séance de tirs au but (score + tableau des tirs) */
+  top: calc(env(safe-area-inset-top, 0px) + 68px);
   left: 50%;
   transform: translateX(-50%);
   background: rgba(9, 18, 32, 0.82);

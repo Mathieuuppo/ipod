@@ -182,6 +182,7 @@ export class ModeArcade {
     ui.montrerBoutonsJeu(true);
     ui.montrerHudMatch(true);
     ui.montrerControlesArcade(true);
+    ui.activerClavierArcade(true); // WASD/flèches + Espace (tir/tacle) + Maj/E (passe/joueur)
     ui.majMatch({ minute: 0, scoreJoueur: 0, scoreAdverse: 0 });
     ui.surPasse = () => this.actionPasse();
     ui.surTirArcade = () => this.actionTir();
@@ -933,6 +934,7 @@ export class ModeArcade {
     this.tempsPause = 2.2;
 
     ui.montrerControlesArcade(false);
+    ui.activerClavierArcade(false); // le clavier de tir tracé prend le relais
     ui.montrerHudMatch(true);
     ui.montrerHudTirs(this.tableauTAB());
     monde.modeArcade(false); // bascule vers le décor de tir (tireur/gardien/cage)
@@ -1098,6 +1100,7 @@ export class ModeArcade {
   nettoyer() {
     const { ui, monde, swipe } = this.ctx;
     ui.montrerControlesArcade(false);
+    ui.activerClavierArcade(false);
     ui.montrerHudMatch(false);
     ui.montrerHudTirs(null);
     ui.montrerInstruction(null);

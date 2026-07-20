@@ -46,13 +46,17 @@ export class UI {
   // ---------- Contrôles arcade : joystick + boutons d'action ----------
 
   initControlesArcade() {
-    this.joystick = { x: 0, y: 0, actif: false }; // vecteur normalisé (-1..1)
+    this.joystick = { x: 0, y: 0, actif: false, pointeurActif: false }; // vecteur normalisé (-1..1)
     this.surPasse = null;  // callbacks branchés par le mode arcade
     this.surTirArcade = null;
+    this.clavierArcade = false;   // le mode arcade est-il actif (clavier autorisé) ?
+    this.touchesArcade = new Set();
 
     const zone = $('joystick');
     const tete = $('joystick-tete');
     const RAYON = 46; // course maximale de la tête (px)
+    this._joystickTete = tete;
+    this._joystickRayon = RAYON;
 
     const majDepuisPointeur = (e) => {
       const rect = zone.getBoundingClientRect();
@@ -67,6 +71,7 @@ export class UI {
     zone.addEventListener('pointerdown', (e) => {
       zone.setPointerCapture(e.pointerId);
       this.joystick.actif = true;
+      this.joystick.pointeurActif = true; // priorité au doigt sur le clavier
       majDepuisPointeur(e);
     });
     zone.addEventListener('pointermove', (e) => {
@@ -74,6 +79,7 @@ export class UI {
     });
     const relacher = () => {
       this.joystick.actif = false;
+      this.joystick.pointeurActif = false;
       this.joystick.x = 0; this.joystick.y = 0;
       tete.style.transform = 'translate(0, 0)';
     };
@@ -89,6 +95,65 @@ export class UI {
       e.preventDefault();
       if (this.surTirArcade) this.surTirArcade();
     });
+
+    // Déplacement au clavier (WASD ou flèches) + actions (Espace/Entrée
+    // pour TIR-TACLE, Maj/E pour PASSE-JOUEUR) : n'agit que pendant un
+    // match arcade (voir activerClavierArcade), pour ne pas interférer
+    // avec la saisie dans les champs des menus.
+    const TOUCHES_DEPLACEMENT = {
+      arrowleft: 'gauche', a: 'gauche', arrowright: 'droite', d: 'droite',
+      arrowup: 'haut', w: 'haut', arrowdown: 'bas', s: 'bas',
+    };
+    window.addEventListener('keydown', (e) => {
+      if (!this.clavierArcade) return;
+      const k = e.key.toLowerCase();
+      const direction = TOUCHES_DEPLACEMENT[k];
+      if (direction) {
+        this.touchesArcade.add(direction);
+        e.preventDefault();
+      } else if (e.code === 'Space' || k === ' ' || k === 'spacebar' || k === 'enter') {
+        if (this.surTirArcade) this.surTirArcade();
+        e.preventDefault();
+      } else if (k === 'shift' || k === 'e') {
+        if (this.surPasse) this.surPasse();
+        e.preventDefault();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      const direction = TOUCHES_DEPLACEMENT[e.key.toLowerCase()];
+      if (direction) this.touchesArcade.delete(direction);
+    });
+  }
+
+  // Active/désactive la lecture du clavier pour le déplacement arcade
+  // (appelé par le mode arcade au démarrage/à la sortie)
+  activerClavierArcade(actif) {
+    this.clavierArcade = actif;
+    this.touchesArcade.clear();
+  }
+
+  // Relit chaque frame les touches de déplacement maintenues et met à
+  // jour le joystick virtuel — mêmes coordonnées que le geste tactile,
+  // donc aucune autre partie du jeu n'a besoin de savoir d'où vient l'ordre.
+  majJoystickClavier() {
+    if (!this.clavierArcade || this.joystick.pointeurActif) return;
+    const t = this.touchesArcade;
+    const x = (t.has('droite') ? 1 : 0) - (t.has('gauche') ? 1 : 0);
+    const y = (t.has('bas') ? 1 : 0) - (t.has('haut') ? 1 : 0);
+    if (x === 0 && y === 0) {
+      if (this.joystick.actif) {
+        this.joystick.actif = false;
+        this.joystick.x = 0; this.joystick.y = 0;
+        this._joystickTete.style.transform = 'translate(0, 0)';
+      }
+      return;
+    }
+    const norme = Math.hypot(x, y) || 1;
+    this.joystick.actif = true;
+    this.joystick.x = x / norme;
+    this.joystick.y = y / norme;
+    this._joystickTete.style.transform =
+      `translate(${this.joystick.x * this._joystickRayon}px, ${this.joystick.y * this._joystickRayon}px)`;
   }
 
   montrerControlesArcade(visible) {

@@ -110,8 +110,9 @@ brancher('btn-resultat-menu', () => quitterVersMenu(menus.apresResultat));
 
 // ---------- Verrous mobile ----------
 
-// L'audio ne peut démarrer qu'après un geste utilisateur
+// L'audio ne peut démarrer qu'après un geste utilisateur (tactile ou clavier)
 document.addEventListener('pointerdown', initAudio);
+document.addEventListener('keydown', initAudio);
 // Bloque le pull-to-refresh / scroll élastique restant (mais pas les
 // champs de saisie des menus)
 document.addEventListener('touchmove', (e) => {
@@ -127,6 +128,8 @@ function boucle() {
   requestAnimationFrame(boucle);
   const dt = monde.rendre();          // rendu + tweens, retourne le pas de temps
   gardien.maj(dt);                    // balancement / plongeon du gardien
+  swipe.majClavier(dt);               // fait avancer le tracé clavier (flèches maintenues)
+  ui.majJoystickClavier();            // relit le clavier arcade (WASD/flèches + espace/E)
   if (modeActif) modeActif.maj(dt);   // logique du mode en cours
 }
 boucle();

@@ -1,12 +1,25 @@
 // ============================================================
-// Gestion tactile : tir "à la Score Hero".
-// Le joueur TRACE la trajectoire souhaitée avec le doigt : le
-// point d'arrivée du tracé donne la cible, la longueur donne la
-// puissance et la courbure du tracé donne l'effet (le ballon
-// suit la courbe dessinée). Fonctionne aussi à la souris.
+// Gestion des tirs : tactile "à la Score Hero" + équivalent clavier.
+// Le joueur TRACE la trajectoire souhaitée avec le doigt (ou la
+// souris) : le point d'arrivée du tracé donne la cible, la longueur
+// donne la puissance et la courbure du tracé donne l'effet.
+//
+// Au clavier, les flèches (ou WASD) déplacent un point synthétique
+// qui reconstitue le même tracé image par image : Haut = puissance,
+// Gauche/Droite = viser et, si on change de sens en cours de charge,
+// courber le tir — Espace/Entrée relâche le tir. Comme le tracé
+// clavier alimente exactement les mêmes points, toute la logique
+// d'analyse du geste (analyser()) est partagée sans dupliquer de code.
 // ============================================================
 
 import { CONFIG, clamp } from './config.js';
+
+const TOUCHES_DIRECTION = {
+  arrowleft: 'gauche', a: 'gauche',
+  arrowright: 'droite', d: 'droite',
+  arrowup: 'haut', w: 'haut',
+  arrowdown: 'bas', s: 'bas',
+};
 
 export class GestionnaireSwipe {
   constructor(element) {
@@ -23,6 +36,69 @@ export class GestionnaireSwipe {
     element.addEventListener('pointermove', (e) => this.mouvement(e));
     element.addEventListener('pointerup', (e) => this.fin(e));
     element.addEventListener('pointercancel', () => this.annuler());
+
+    // Clavier : mêmes callbacks, tracé synthétique construit frame par frame
+    this.touchesClavier = new Set();
+    this.clavierActif = false;
+    window.addEventListener('keydown', (e) => this.toucheAppuyee(e));
+    window.addEventListener('keyup', (e) => this.toucheRelachee(e));
+  }
+
+  toucheAppuyee(e) {
+    if (!this.actif) return;
+    const k = e.key.toLowerCase();
+    const direction = TOUCHES_DIRECTION[k];
+    if (direction) {
+      this.touchesClavier.add(direction);
+      if (!this.clavierActif) this.demarrerClavier();
+      e.preventDefault();
+    } else if (e.code === 'Space' || k === ' ' || k === 'spacebar' || k === 'enter') {
+      if (this.clavierActif) this.relacherClavier();
+      else if (this.surTap) this.surTap();
+      e.preventDefault();
+    }
+  }
+
+  toucheRelachee(e) {
+    const direction = TOUCHES_DIRECTION[e.key.toLowerCase()];
+    if (direction) this.touchesClavier.delete(direction);
+  }
+
+  demarrerClavier() {
+    this.clavierActif = true;
+    // Point de départ synthétique : bas de l'écran, comme un swipe au doigt
+    const origine = { x: window.innerWidth / 2, y: window.innerHeight * 0.84, t: performance.now() };
+    this.points = [origine];
+  }
+
+  // Appelé chaque frame par la boucle de jeu tant qu'une touche directionnelle
+  // est maintenue : fait avancer le point synthétique comme le ferait un doigt.
+  majClavier(dt) {
+    if (!this.clavierActif) return;
+    const t = this.touchesClavier;
+    const vx = (t.has('droite') ? 1 : 0) - (t.has('gauche') ? 1 : 0);
+    const vy = (t.has('haut') ? 1 : 0) - (t.has('bas') ? 1 : 0);
+    const echelle = Math.min(window.innerWidth, window.innerHeight);
+    const dernier = this.points[this.points.length - 1];
+    const point = {
+      x: clamp(dernier.x + vx * echelle * 0.85 * dt, 0, window.innerWidth),
+      y: clamp(dernier.y - vy * echelle * 0.85 * dt, 0, window.innerHeight),
+      t: performance.now(),
+    };
+    this.points.push(point);
+    if (this.points.length > 300) this.points.shift(); // limite mémoire si la touche reste enfoncée
+    if (this.surProgression) this.surProgression(this.points);
+  }
+
+  relacherClavier() {
+    this.clavierActif = false;
+    const geste = this.analyser();
+    this.points = [];
+    if (!geste) {
+      if (this.surTap) this.surTap();
+      return;
+    }
+    if (this.surTir) this.surTir(geste);
   }
 
   debut(e) {

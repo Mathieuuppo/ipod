@@ -57,6 +57,20 @@ tir par le gardien, sa vitesse de réaction et le timing du mur.
   direction du joystick oriente aussi les passes et la visée du tir.
 - Bouton 📷 : capture d'écran. Bouton ✕ : retour au menu.
 
+### Jouer au clavier
+
+Tout le jeu est aussi jouable sans écran tactile :
+
+- **Tir tracé** (coup franc, penalty, occasions, tirs au but) : flèches ou
+  **WASD** pour déplacer le point de visée (Haut = puissance, Gauche/Droite
+  = viser — inverser de sens en cours de charge courbe le tir), **Espace**
+  ou **Entrée** pour tirer/valider.
+- **Match Arcade** : flèches ou **WASD** pour courir, **Espace**/**Entrée**
+  pour TIR (ou TACLE en défense), **Maj** ou **E** pour PASSE (ou changer
+  de joueur en défense). Un déplacement au clavier suit exactement les
+  mêmes règles qu'au joystick (passe en profondeur en poussant "Haut" fort
+  avant d'appuyer sur PASSE, etc.).
+
 ## Architecture
 
 ```

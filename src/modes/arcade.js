@@ -950,27 +950,40 @@ export class ModeArcade {
     return `TOI  ${ligne(this.tabJoueur)}\nIA   ${ligne(this.tabIA)}`;
   }
 
+  // (gardien.maj(dt) est déjà appelé une fois par frame par la boucle
+  // principale — inutile et nuisible de le rappeler ici : ça ferait
+  // avancer deux fois plus vite le plongeon pendant les tirs au but.)
   majTAB(dt) {
-    const { gardien, ui } = this.ctx;
+    const { ui } = this.ctx;
 
     if (this.tabPhase === 'attente') {
       this.tempsPause -= dt;
       if (this.tempsPause <= 0) {
         if (this.tabTourJoueur) this.lancerTirJoueurTAB();
-        else this.lancerTirIATAB();
+        else this.demarrerChoixGardienTAB();
       }
       return;
     }
 
+    if (this.tabPhase === 'choix-gardien') {
+      // Fenêtre de décision : sans choix, le gardien reste au centre
+      this.tempsPause -= dt;
+      if (this.tempsPause <= 0) this.choisirPlongeonTAB('centre');
+      return;
+    }
+
     if (this.tabPhase === 'vol') {
-      gardien.maj(dt);
       if (!this.tabSequence) return; // joueur : en attente du geste de tir
       const resultat = this.tabSequence.maj(dt);
       if (resultat) {
         const but = resultat === 'but';
         (this.tabTourJoueur ? this.tabJoueur : this.tabIA).push(but);
-        if (this.tabTourJoueur) sauvegarde.enregistrerPenalty(but);
-        this.jouerSonTAB(resultat);
+        if (this.tabTourJoueur) {
+          sauvegarde.enregistrerPenalty(but);
+          this.jouerSonTAB(resultat);
+        } else {
+          this.jouerSonAdverseTAB(resultat);
+        }
         ui.montrerHudTirs(this.tableauTAB());
         this.tabSequence = null;
         if (this.verifierFinTAB()) return;
@@ -1007,33 +1020,70 @@ export class ModeArcade {
     };
   }
 
+  // ---------- Tir adverse : le joueur devient le gardien ----------
+
+  demarrerChoixGardienTAB() {
+    const { monde, gardien, ui, swipe } = this.ctx;
+    this.tabPhase = 'choix-gardien';
+    monde.placerPenalty();
+    gardien.reinitialiser();
+    ui.montrerInstruction('Le tireur adverse arrive ! Choisis ton côté !');
+    swipe.modeGardien = true;
+    swipe.surChoixGardien = (direction) => this.choisirPlongeonTAB(direction);
+    this.tempsPause = 1.3;
+    sons.clic();
+  }
+
+  choisirPlongeonTAB(direction) {
+    if (this.tabPhase !== 'choix-gardien') return; // déjà tranché
+    const { gardien, ui, swipe } = this.ctx;
+    swipe.modeGardien = false;
+    swipe.surChoixGardien = null;
+    ui.montrerInstruction(null);
+    gardien.plongerCommande(direction, this.ctx.difficulte);
+    this.lancerTirIATAB();
+  }
+
+  // Le tireur adverse vise indépendamment du plongeon déjà engagé — la
+  // difficulté règle sa précision/puissance, pas une lecture du gardien
+  // (qui n'existe plus ici : c'est le joueur qui a choisi).
   lancerTirIATAB() {
     const { monde, gardien } = this.ctx;
     this.tabPhase = 'vol';
-    monde.placerPenalty();
-    gardien.reinitialiser();
     monde.animerFrappe();
     sons.frappe();
     const cote = Math.random() < 0.5 ? -1 : 1;
+    const precision = this.reglages.iaChanceButPenalty;
+    const cadre = Math.random() < 0.65 + precision * 0.3;
     this.tabSequence = new SequenceTir(monde, gardien, this.ctx.difficulte, false);
-    this.tabSequence.surEvenement = (type) => this.jouerSonTAB(type);
-    if (Math.random() < this.reglages.iaChanceButPenalty) {
-      // Tir cadré : au ras du poteau, à l'opposé de la plongée du gardien
-      this.tabSequence.lancer(
-        { cible: { x: cote * 3.1, y: alea(0.4, 1.9) }, puissance: 23, spin: 0 },
-        { x: -cote * 2.4, y: 1 });
+    this.tabSequence.surEvenement = (type) => this.jouerSonAdverseTAB(type);
+    if (cadre) {
+      const cible = { x: cote * alea(2.2 + precision * 1.1, 3.35), y: alea(0.3, 1.9) };
+      this.tabSequence.lancer({ cible, puissance: 21 + precision * 4, spin: 0 }, null, false);
     } else {
-      // Raté : au-dessus ou nettement à côté
-      this.tabSequence.lancer({ cible: { x: cote * alea(4, 6.4), y: alea(0.3, 3.6) }, puissance: 24, spin: 0 });
+      const cible = { x: cote * alea(3.8, 6.2), y: alea(0.3, 3.6) };
+      this.tabSequence.lancer({ cible, puissance: 23, spin: 0 }, null, false);
     }
   }
 
+  // Sons du point de vue du joueur : ses propres tirs (jouerSonTAB) et
+  // ceux du tireur adverse (jouerSonAdverseTAB) n'ont pas la même charge
+  // émotionnelle — un but adverse n'est pas une raison de sortir les
+  // confettis !
   jouerSonTAB(type) {
     const { ui } = this.ctx;
     if (type === 'but') { sons.but(); ui.lancerConfettis(); }
     else if (type === 'poteau') sons.poteau();
     else if (type === 'arret') sons.arret();
     else sons.rate();
+  }
+
+  jouerSonAdverseTAB(type) {
+    const { ui } = this.ctx;
+    if (type === 'but') { sons.rate(); ui.vibrer(60); }
+    else if (type === 'arret') { sons.arret(); ui.vibrer(35); }
+    else if (type === 'poteau') sons.poteau();
+    else sons.arret();
   }
 
   // Règles de la séance : 5 tirs chacun, puis mort subite si égalité
@@ -1110,6 +1160,8 @@ export class ModeArcade {
     swipe.actif = false;
     swipe.surTir = null;
     swipe.surProgression = null;
+    swipe.modeGardien = false;
+    swipe.surChoixGardien = null;
     monde.modeArcade(false);
     monde.placerCoupFranc(18, 0, 4); // restaure le décor et la caméra des menus
   }

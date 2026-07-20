@@ -28,7 +28,9 @@ dans `assets/vendor/`.
 - **🎯 Coup Franc** — 5 tirs depuis des positions variées, avec mur qui
   saute et gardien qui plonge. Étoiles selon le nombre de buts.
 - **🥅 Penalty** — séance de tirs au but contre l'IA : 5 tirs chacun,
-  puis mort subite.
+  puis mort subite. Sur les tirs adverses, **tu deviens le gardien** :
+  choisis un côté avant que le tireur ne frappe (tap gauche/centre/droite,
+  ou clavier), le tireur vise indépendamment — deviner juste sauve le tir.
 - **🏆 Match** — 90 minutes accélérées : une succession d'occasions
   (coup franc, penalty ou mini-jeu de timing) pendant que l'IA marque
   selon la difficulté.
@@ -52,6 +54,10 @@ tir par le gardien, sa vitesse de réaction et le timing du mur.
     enroulé qui contourne le mur avant de revenir sur la cible.
 - Mini-jeu de timing (mode match) : taper quand le curseur est dans la
   zone verte.
+- Sur un penalty adverse (mode Penalty, ou tirs au but après prolongation
+  en Match Arcade) : tape à gauche/au centre/à droite de l'écran (ou
+  flèche gauche/droite/bas, ou A/D/S) pour choisir le côté où plonge
+  ton gardien, avant que le tireur adverse ne frappe.
 - Mode arcade : joystick virtuel en bas à gauche (pousser vers le haut =
   attaquer), boutons d'action en bas à droite. En possession du ballon la
   direction du joystick oriente aussi les passes et la visée du tir.

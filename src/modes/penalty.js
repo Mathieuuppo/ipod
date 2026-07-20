@@ -1,11 +1,14 @@
 // ============================================================
 // Mode Penalty : séance de tirs au but contre l'IA.
 // 5 tirs chacun en alternance (le joueur commence), puis mort
-// subite. Les tirs de l'IA sont résolus par probabilité (selon
-// la difficulté) avec un petit temps de suspense.
+// subite. Sur les tirs adverses, LE JOUEUR devient le gardien : il
+// choisit un côté (tap gauche/centre/droite, flèches, ou A/D/S) avant
+// que le tireur adverse frappe. Le tireur choisit sa cible en même
+// temps et indépendamment — deviner le bon côté reste un pari, et la
+// difficulté règle la précision/puissance du tir plutôt que le hasard.
 // ============================================================
 
-import { CONFIG, DIFFICULTES } from '../config.js';
+import { CONFIG, DIFFICULTES, alea } from '../config.js';
 import { SequenceTir } from '../shot.js';
 import { sauvegarde } from '../storage.js';
 import { sons } from '../audio.js';
@@ -97,24 +100,29 @@ export class ModePenalty {
 
     if (this.phase === 'attente-ia') {
       this.tempsPhase -= dt;
-      if (this.tempsPhase <= 0) {
-        // Tir adverse : petit suspense avant le verdict
-        this.phase = 'ia';
-        this.tempsPhase = 1.4;
-        ui.montrerMessage("L'IA s'élance…", 1300);
-        sons.frappe();
-      }
+      if (this.tempsPhase <= 0) this.demarrerChoixGardien();
       return;
     }
 
-    if (this.phase === 'ia') {
+    if (this.phase === 'choix-gardien') {
+      // Fenêtre de décision : si le joueur ne choisit pas, le gardien
+      // reste au centre — le tireur adverse tire de toute façon.
       this.tempsPhase -= dt;
-      if (this.tempsPhase <= 0) {
-        const but = Math.random() < DIFFICULTES[difficulte].iaChanceButPenalty;
+      if (this.tempsPhase <= 0) this.choisirPlongeon('centre');
+      return;
+    }
+
+    if (this.phase === 'ia' && this.sequence) {
+      const resultat = this.sequence.maj(dt);
+      if (resultat) {
+        const but = resultat === 'but';
         this.tirsIA.push(but);
-        ui.montrerMessage(but ? "BUT de l'IA…" : "TON GARDIEN L'ARRÊTE ! 🧤");
-        if (but) sons.rate(); else sons.but();
+        const messages = {
+          but: "BUT de l'IA…", arret: 'ARRÊTÉ ! 🧤', poteau: 'SUR LE POTEAU !', dehors: 'IL RATE SON TIR !',
+        };
+        ui.montrerMessage(messages[resultat] || messages.dehors);
         ui.montrerHudTirs(this.tableau());
+        this.sequence = null;
         if (this.verifierFin()) return;
         this.phase = 'attente-joueur';
         this.tempsPhase = 1.6;
@@ -125,6 +133,60 @@ export class ModePenalty {
     if (this.phase === 'attente-joueur') {
       this.tempsPhase -= dt;
       if (this.tempsPhase <= 0) this.preparerTirJoueur();
+    }
+  }
+
+  // ---------- Tour adverse : le joueur devient le gardien ----------
+
+  demarrerChoixGardien() {
+    const { monde, gardien, ui, swipe } = this.ctx;
+    this.phase = 'choix-gardien';
+    monde.placerPenalty();
+    gardien.reinitialiser();
+    ui.montrerInstruction('Le tireur adverse arrive ! Choisis ton côté !');
+    swipe.modeGardien = true;
+    swipe.surChoixGardien = (direction) => this.choisirPlongeon(direction);
+    this.tempsPhase = 1.3; // fenêtre de décision avant que le tir ne parte
+    sons.clic();
+  }
+
+  choisirPlongeon(direction) {
+    if (this.phase !== 'choix-gardien') return; // déjà tranché (double appui)
+    const { gardien, ui, swipe, difficulte } = this.ctx;
+    swipe.modeGardien = false;
+    swipe.surChoixGardien = null;
+    ui.montrerInstruction(null);
+    gardien.plongerCommande(direction, difficulte);
+    this.lancerTirAdverse(difficulte);
+  }
+
+  // Le tireur adverse choisit sa cible indépendamment du plongeon déjà
+  // engagé — la difficulté règle sa précision et sa puissance, pas le
+  // fait de "deviner" le gardien (qui n'existe plus, il est joué).
+  lancerTirAdverse(difficulte) {
+    const { monde, gardien, ui } = this.ctx;
+    this.phase = 'ia';
+    monde.animerFrappe();
+    sons.frappe();
+
+    const precision = DIFFICULTES[difficulte].iaChanceButPenalty; // 0.55 / 0.70 / 0.82
+    const cote = Math.random() < 0.5 ? -1 : 1;
+    const cadre = Math.random() < 0.65 + precision * 0.3;
+
+    this.sequence = new SequenceTir(monde, gardien, difficulte, false);
+    this.sequence.surEvenement = (type) => {
+      if (type === 'but') sons.rate();          // mauvais pour nous
+      else if (type === 'arret') sons.arret();   // le gardien claque le ballon
+      else if (type === 'poteau') sons.poteau();
+      else sons.arret();                          // à côté : bon pour nous aussi
+    };
+    if (cadre) {
+      // Plus la difficulté est haute, plus le tir se colle au poteau
+      const cible = { x: cote * alea(2.2 + precision * 1.1, 3.35), y: alea(0.3, 1.9) };
+      this.sequence.lancer({ cible, puissance: 21 + precision * 4, spin: 0 }, null, false);
+    } else {
+      const cible = { x: cote * alea(3.8, 6.2), y: alea(0.3, 3.6) };
+      this.sequence.lancer({ cible, puissance: 23, spin: 0 }, null, false);
     }
   }
 
@@ -173,6 +235,8 @@ export class ModePenalty {
     swipe.actif = false;
     swipe.surTir = null;
     swipe.surProgression = null;
+    swipe.modeGardien = false;
+    swipe.surChoixGardien = null;
     ui.montrerHudTirs(null);
     ui.montrerInstruction(null);
     ui.effacerTrace();

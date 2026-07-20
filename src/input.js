@@ -31,6 +31,11 @@ export class GestionnaireSwipe {
     this.surProgression = null;// callback(points) pendant le tracé (ligne à l'écran)
     this.surTap = null;        // callback() sur un tap court (mini-jeu de timing)
 
+    // Mode "je suis le gardien" (penalty adverse) : un tap ou une touche
+    // choisit un côté au lieu de tracer un tir.
+    this.modeGardien = false;
+    this.surChoixGardien = null; // callback('gauche' | 'centre' | 'droite')
+
     // Souris + tactile via Pointer Events
     element.addEventListener('pointerdown', (e) => this.debut(e));
     element.addEventListener('pointermove', (e) => this.mouvement(e));
@@ -45,6 +50,18 @@ export class GestionnaireSwipe {
   }
 
   toucheAppuyee(e) {
+    if (this.modeGardien) {
+      const k = e.key.toLowerCase();
+      const direction = TOUCHES_DIRECTION[k];
+      if (direction === 'gauche' || direction === 'droite') {
+        if (this.surChoixGardien) this.surChoixGardien(direction);
+        e.preventDefault();
+      } else if (direction === 'bas' || e.code === 'Space' || k === ' ' || k === 'spacebar' || k === 'enter') {
+        if (this.surChoixGardien) this.surChoixGardien('centre');
+        e.preventDefault();
+      }
+      return;
+    }
     if (!this.actif) return;
     const k = e.key.toLowerCase();
     const direction = TOUCHES_DIRECTION[k];
@@ -102,6 +119,12 @@ export class GestionnaireSwipe {
   }
 
   debut(e) {
+    if (this.modeGardien) {
+      const fraction = e.clientX / window.innerWidth;
+      const direction = fraction < 0.38 ? 'gauche' : fraction > 0.62 ? 'droite' : 'centre';
+      if (this.surChoixGardien) this.surChoixGardien(direction);
+      return;
+    }
     if (!this.actif) return;
     this.enCours = true;
     this.points = [{ x: e.clientX, y: e.clientY, t: performance.now() }];

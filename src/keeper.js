@@ -38,6 +38,21 @@ export class Gardien {
     this.etat = 'reaction';
   }
 
+  // Plongeon COMMANDÉ par le joueur (mode "je suis le gardien" : penalty
+  // adverse). Contrairement à anticiper(), qui devine le tir avec une
+  // erreur liée à la difficulté, ici le joueur choisit lui-même le côté —
+  // le gardien s'engage exactement où on le lui demande, sans erreur de
+  // lecture. Le suspense vient du fait que le tireur choisit sa cible en
+  // même temps, indépendamment : deviner juste reste un pari.
+  plongerCommande(direction, difficulte) {
+    const X = CONFIG.butDemiLargeur * 0.8;
+    this.cible.x = direction === 'gauche' ? -X : direction === 'droite' ? X : 0;
+    this.cible.y = direction === 'centre' ? 0.85 : 1.05;
+    this.tempsAvantPlongeon = 0.12; // engagement quasi immédiat : c'est un choix, pas une lecture
+    this.origineX = this.monde.gardien.position.x;
+    this.etat = 'reaction';
+  }
+
   // Avance l'animation. À appeler chaque frame pendant un tir.
   maj(dt) {
     const g = this.monde.gardien;

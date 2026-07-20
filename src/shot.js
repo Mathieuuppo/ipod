@@ -40,7 +40,9 @@ export class SequenceTir {
   //    ballon sur la cible (le tir enroulé contourne le mur)
   // cibleGardien (optionnel) force le point que le gardien croit devoir
   // couvrir — utilisé par le mini-jeu de timing du mode match.
-  lancer({ cible, puissance, spin }, cibleGardien = null) {
+  // gererGardien = false : ne touche pas au gardien (le mode de jeu l'a
+  // déjà fait plonger lui-même, ex. plongeon commandé par le joueur).
+  lancer({ cible, puissance, spin }, cibleGardien = null, gererGardien = true) {
     const g = CONFIG.gravite;
     const x0 = this.pos.x, y0 = this.pos.y, D = this.pos.z; // distance au but
     const dy = cible.y - y0;
@@ -74,9 +76,12 @@ export class SequenceTir {
     this.delaiSautMur = alea(dMin, dMax);
 
     // Le gardien anticipe le point d'impact réel (pré-simulation silencieuse),
-    // sauf si une cible lui est imposée par le mode de jeu
-    const impact = cibleGardien || this.predireImpact();
-    this.gardien.anticiper(impact.x, impact.y, this.difficulte);
+    // sauf si une cible lui est imposée par le mode de jeu, ou si le mode
+    // de jeu gère lui-même le gardien (plongeon déjà commandé par le joueur)
+    if (gererGardien) {
+      const impact = cibleGardien || this.predireImpact();
+      this.gardien.anticiper(impact.x, impact.y, this.difficulte);
+    }
   }
 
   // Pré-simulation rapide (mêmes équations, sans collisions) pour savoir

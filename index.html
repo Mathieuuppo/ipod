@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mathieu — Communication</title>
+<meta name="description" content="Portfolio de Mathieu, jeune diplômé Master Communication.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Permanent+Marker&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <a href="#accueil" class="logo">Mathieu<span class="logo-dots">¨</span></a>
+  <button class="menu-toggle" id="menuToggle" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="overlayNav">
+    <span></span><span></span>
+  </button>
+</header>
+
+<nav class="overlay-nav" id="overlayNav">
+  <ul>
+    <li><a href="#accueil">Accueil</a></li>
+    <li><a href="#apropos">À propos</a></li>
+    <li><a href="#competences">Compétences</a></li>
+    <li><a href="#experiences">Expériences</a></li>
+    <li><a href="#projets">Projets</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ul>
+  <div class="overlay-social">
+    <a href="mailto:mathieudome30@gmail.com" aria-label="Email">✉</a>
+    <a href="#" aria-label="LinkedIn">in</a>
+  </div>
+</nav>
+
+<main>
+
+  <section id="accueil" class="hero sky">
+    <div class="hero-inner">
+      <p class="lead-in">On m'a dit…</p>
+      <h1 class="statement">TU NE VAS<br>JAMAIS TROUVER</h1>
+      <p class="lead-in lead-in--sub">Et si j'arrêtais d'attendre ?</p>
+      <h1 class="statement">ET SI JE CRÉAIS<br>MA CHANCE ?</h1>
+
+      <div class="hero-cta">
+        <span class="role">Mathieu — Master Communication</span>
+        <div class="cta-buttons">
+          <a href="#contact" class="btn">Me contacter</a>
+          <a href="cv-mathieu.pdf" class="btn btn-outline" download>Télécharger mon CV</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="apropos" class="section sky-alt">
+    <h2 class="section-title">À PROPOS</h2>
+    <div class="about-grid">
+      <div class="photo-frame">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+          <circle cx="100" cy="78" r="38"/>
+          <path d="M30 190c0-45 31-72 70-72s70 27 70 72"/>
+        </svg>
+        <span class="photo-hint">Ta photo ici</span>
+      </div>
+      <div class="bio-text">
+        <p>Jeune diplômé d'un <strong>Master en Communication</strong>, je cherche un poste où je peux allier stratégie, créativité et sens du contact humain.</p>
+        <p>Curieux, organisé et toujours partant pour apprendre, j'aime transformer une idée en histoire qui parle vraiment aux gens — que ce soit sur les réseaux, en événementiel ou en relations presse.</p>
+        <p>Aujourd'hui, je suis à la recherche d'une opportunité pour mettre mon énergie au service d'une équipe.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="competences" class="section">
+    <h2 class="section-title">COMPÉTENCES</h2>
+    <ul class="skills-grid">
+      <li>Stratégie de communication</li>
+      <li>Réseaux sociaux</li>
+      <li>Relations presse</li>
+      <li>Storytelling</li>
+      <li>Gestion de projet</li>
+      <li>Adobe Suite</li>
+      <li>Rédaction &amp; contenu</li>
+      <li>Événementiel</li>
+    </ul>
+  </section>
+
+  <section id="experiences" class="section sky-alt">
+    <h2 class="section-title">EXPÉRIENCES</h2>
+    <div class="carousel" data-carousel>
+      <div class="carousel-track">
+        <article class="card">
+          <span class="card-tag">2025 — 2026</span>
+          <h3>Chargé de communication (stage)</h3>
+          <p class="card-org">Nom de l'entreprise</p>
+          <p class="card-desc">Description de la mission, des résultats obtenus et des outils utilisés.</p>
+        </article>
+        <article class="card">
+          <span class="card-tag">2024 — 2025</span>
+          <h3>Alternant communication digitale</h3>
+          <p class="card-org">Nom de l'entreprise</p>
+          <p class="card-desc">Description de la mission, des résultats obtenus et des outils utilisés.</p>
+        </article>
+        <article class="card">
+          <span class="card-tag">2023</span>
+          <h3>Stage communication événementielle</h3>
+          <p class="card-org">Nom de l'entreprise</p>
+          <p class="card-desc">Description de la mission, des résultats obtenus et des outils utilisés.</p>
+        </article>
+      </div>
+      <div class="carousel-controls">
+        <button class="arrow-btn" data-prev aria-label="Précédent">‹</button>
+        <button class="arrow-btn" data-next aria-label="Suivant">›</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="projets" class="section">
+    <h2 class="section-title">PROJETS</h2>
+    <div class="carousel" data-carousel>
+      <div class="carousel-track">
+        <article class="card card--project">
+          <div class="card-media"></div>
+          <h3>Nom du projet</h3>
+          <p class="card-desc">Courte description du projet, du contexte et de ton rôle.</p>
+        </article>
+        <article class="card card--project">
+          <div class="card-media"></div>
+          <h3>Nom du projet</h3>
+          <p class="card-desc">Courte description du projet, du contexte et de ton rôle.</p>
+        </article>
+        <article class="card card--project">
+          <div class="card-media"></div>
+          <h3>Nom du projet</h3>
+          <p class="card-desc">Courte description du projet, du contexte et de ton rôle.</p>
+        </article>
+      </div>
+      <div class="carousel-controls">
+        <button class="arrow-btn" data-prev aria-label="Précédent">‹</button>
+        <button class="arrow-btn" data-next aria-label="Suivant">›</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="contact" class="section sky-alt contact-section">
+    <h2 class="section-title">CONTACT</h2>
+    <p class="contact-line">Envie de travailler ensemble ?</p>
+    <a href="mailto:mathieudome30@gmail.com" class="contact-email">mathieudome30@gmail.com</a>
+    <div class="social-row">
+      <a href="mailto:mathieudome30@gmail.com" aria-label="Email">✉</a>
+      <a href="#" aria-label="LinkedIn">in</a>
+      <a href="#" aria-label="Instagram">◎</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <span class="logo-footer">Mathieu<span class="logo-dots">¨</span></span>
+  <p>© 2026 Mathieu — Master Communication</p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

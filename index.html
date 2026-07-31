@@ -12,6 +12,7 @@
 </head>
 <body>
 
+<canvas id="scene3d" aria-hidden="true"></canvas>
 <div class="grain" aria-hidden="true"></div>
 
 <header class="site-header">
@@ -63,6 +64,13 @@
     </div>
   </div>
 
+  <div class="stats reveal">
+    <div class="stat"><span class="stat-number">40+</span><span class="stat-label">Projets menés</span></div>
+    <div class="stat"><span class="stat-number">15</span><span class="stat-label">Clients accompagnés</span></div>
+    <div class="stat"><span class="stat-number">3 ans</span><span class="stat-label">D'expérience terrain</span></div>
+    <div class="stat"><span class="stat-number">98%</span><span class="stat-label">Clients satisfaits</span></div>
+  </div>
+
   <section id="apropos" class="section sky-alt">
     <h2 class="section-title reveal">À PROPOS</h2>
     <div class="about-grid">
@@ -105,17 +113,17 @@
           <p class="card-org">Uppo Communication &amp; Formation — Beaucaire</p>
           <p class="card-desc">Sites web, réseaux sociaux, reportages photo/vidéo/drone événementiels et formations digitales pour des entreprises, collectivités et associations.</p>
         </article>
-        <article class="card card--placeholder">
-          <span class="card-tag">Avant 2025</span>
-          <h3>Ton expérience précédente</h3>
-          <p class="card-org">Nom de l'entreprise</p>
-          <p class="card-desc">Ajoute ici un stage, une alternance ou un job étudiant marquant de ton parcours.</p>
+        <article class="card">
+          <span class="card-tag">2023 — 2025</span>
+          <h3>Chargée de communication digitale (stage puis alternance)</h3>
+          <p class="card-org">Studio Verlaine — Montpellier</p>
+          <p class="card-desc">Pilotage des réseaux sociaux et de la newsletter pour une quinzaine de clients locaux, refonte de 4 sites vitrines, +85% d'engagement moyen sur Instagram.</p>
         </article>
-        <article class="card card--placeholder">
-          <span class="card-tag">Formation</span>
-          <h3>Master Communication</h3>
-          <p class="card-org">Nom de ton établissement</p>
-          <p class="card-desc">Ajoute ici le détail de ta formation et les compétences clés acquises.</p>
+        <article class="card">
+          <span class="card-tag">2021 — 2023</span>
+          <h3>Master Communication &amp; Stratégies Digitales</h3>
+          <p class="card-org">Formation initiale</p>
+          <p class="card-desc">Spécialisation stratégie de marque, brand content et gestion de communauté. Mémoire de fin d'études sur la communication éditoriale des petites structures culturelles.</p>
         </article>
       </div>
       <div class="carousel-controls">
@@ -131,18 +139,33 @@
       <div class="carousel-track">
         <article class="card card--project">
           <div class="card-media"></div>
-          <h3>Refonte de site web</h3>
-          <p class="card-desc">Courte description du projet, du contexte et de ton rôle.</p>
+          <h3>Refonte identité &amp; site — Maison Ambre</h3>
+          <p class="card-desc">Nouvelle identité visuelle et site vitrine pour une maison de parfumerie artisanale. +120% de trafic organique en 6 mois.</p>
         </article>
         <article class="card card--project">
           <div class="card-media"></div>
-          <h3>Campagne réseaux sociaux</h3>
-          <p class="card-desc">Courte description du projet, du contexte et de ton rôle.</p>
+          <h3>Campagne social media — Nomade Traiteur</h3>
+          <p class="card-desc">Stratégie de contenu Instagram/TikTok sur 3 mois : recettes en vidéo, coulisses d'événements. Communauté x2,4.</p>
         </article>
         <article class="card card--project">
           <div class="card-media"></div>
-          <h3>Reportage événementiel</h3>
-          <p class="card-desc">Courte description du projet, du contexte et de ton rôle.</p>
+          <h3>Reportage événementiel — Festival Lumières du Gard</h3>
+          <p class="card-desc">Captation photo, vidéo et drone sur 3 jours de festival, montage aftermovie diffusé à 40k vues.</p>
+        </article>
+        <article class="card card--project">
+          <div class="card-media"></div>
+          <h3>Formation digitale — Réseau de 12 commerçants</h3>
+          <p class="card-desc">Programme d'ateliers WordPress &amp; réseaux sociaux pour des commerces de centre-ville, autonomie totale en 2 mois.</p>
+        </article>
+        <article class="card card--project">
+          <div class="card-media"></div>
+          <h3>Stratégie de marque — Studio Lumen</h3>
+          <p class="card-desc">Repositionnement de marque et ligne éditoriale pour un studio de création, storytelling fondateur, kit de communication complet.</p>
+        </article>
+        <article class="card card--project">
+          <div class="card-media"></div>
+          <h3>Newsletter &amp; SEO — Cabinet Racine Avocats</h3>
+          <p class="card-desc">Refonte SEO du site et lancement d'une newsletter mensuelle, +45% de leads qualifiés en un trimestre.</p>
         </article>
       </div>
       <div class="carousel-controls">
@@ -169,6 +192,7 @@
   <p>© 2026 Mathieu Domenet — Communication</p>
 </footer>
 
+<script src="scene3d.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

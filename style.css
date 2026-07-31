@@ -48,21 +48,29 @@ body {
   overflow-x: hidden;
 }
 
-/* ── Cloudy sky background ─────────────────────────────────────────── */
+/* ── 3D scene layer ─────────────────────────────────────────────────── */
+#scene3d {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  display: block;
+}
+
+/* ── Cloudy sky background (translucent so the 3D scene shows through) ── */
 .sky, .sky-alt {
   position: relative;
   background:
-    radial-gradient(ellipse 60% 40% at 15% 10%, #ffffff 0%, transparent 60%),
-    radial-gradient(ellipse 50% 35% at 85% 25%, #ffffff 0%, transparent 55%),
-    radial-gradient(ellipse 70% 50% at 50% 90%, #cfcfca 0%, transparent 60%),
-    linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 60%, var(--sky-3) 100%);
+    radial-gradient(ellipse 60% 40% at 15% 10%, color-mix(in srgb, var(--sky-1) 70%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 50% 90%, color-mix(in srgb, var(--sky-3) 55%, transparent) 0%, transparent 60%),
+    color-mix(in srgb, var(--sky-1) 55%, transparent);
 }
 .sky-alt {
   background:
-    radial-gradient(ellipse 55% 35% at 80% 10%, #ffffff 0%, transparent 55%),
-    radial-gradient(ellipse 65% 45% at 20% 85%, #c9c9c4 0%, transparent 60%),
-    linear-gradient(180deg, var(--sky-2) 0%, var(--sky-1) 50%, var(--sky-2) 100%);
+    radial-gradient(ellipse 55% 35% at 80% 10%, color-mix(in srgb, var(--sky-1) 65%, transparent) 0%, transparent 55%),
+    radial-gradient(ellipse 65% 45% at 20% 85%, color-mix(in srgb, var(--sky-3) 60%, transparent) 0%, transparent 60%),
+    color-mix(in srgb, var(--sky-2) 65%, transparent);
 }
+.hero.sky { background: none; }
 
 /* ── Film grain overlay ────────────────────────────────────────────── */
 .grain {
@@ -222,7 +230,7 @@ body {
   font-size: 14px;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: #555;
+  color: color-mix(in srgb, var(--ink) 60%, transparent);
   margin-bottom: 20px;
 }
 .cta-buttons {
@@ -280,6 +288,36 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .marquee-track { animation: none; }
+}
+
+/* ── Stats band ─────────────────────────────────────────────────────── */
+.stats {
+  position: relative;
+  z-index: 2;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 64px 24px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  text-align: center;
+}
+.stat-number {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 6vw, 48px);
+  color: var(--accent);
+}
+.stat-label {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 65%, transparent);
+}
+@media (max-width: 600px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* ── Scroll reveal ──────────────────────────────────────────────────── */
@@ -340,7 +378,7 @@ body {
   text-align: left;
   font-size: 16px;
   line-height: 1.7;
-  color: #222;
+  color: color-mix(in srgb, var(--ink) 85%, transparent);
 }
 .bio-text p + p { margin-top: 16px; }
 
@@ -389,12 +427,12 @@ body {
   font-size: 12px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: #666;
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
   margin-bottom: 10px;
 }
 .card h3 { font-size: 18px; margin-bottom: 6px; }
-.card-org { font-size: 13px; color: #555; margin-bottom: 12px; }
-.card-desc { font-size: 14px; line-height: 1.6; color: #333; }
+.card-org { font-size: 13px; color: color-mix(in srgb, var(--ink) 60%, transparent); margin-bottom: 12px; }
+.card-desc { font-size: 14px; line-height: 1.6; color: color-mix(in srgb, var(--ink) 78%, transparent); }
 
 .card--placeholder {
   background: transparent;
@@ -432,7 +470,7 @@ body {
 
 /* Contact */
 .contact-section .section-title { margin-bottom: 24px; }
-.contact-line { font-size: 16px; color: #333; margin-bottom: 20px; }
+.contact-line { font-size: 16px; color: color-mix(in srgb, var(--ink) 78%, transparent); margin-bottom: 20px; }
 .contact-email {
   font-family: var(--font-display);
   font-size: clamp(20px, 5vw, 32px);

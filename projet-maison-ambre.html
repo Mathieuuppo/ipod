@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Refonte identité & site — Maison Ambre — Mathieu Domenet</title>
+<meta name="description" content="Nouvelle identité visuelle et site vitrine pour une maison de parfumerie artisanale.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Permanent+Marker&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="scene3d" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="site-header">
+  <a href="index.html" class="logo">Mathieu<span class="logo-dots">¨</span></a>
+  <button class="menu-toggle" id="menuToggle" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="overlayNav">
+    <span></span><span></span>
+  </button>
+</header>
+
+<nav class="overlay-nav" id="overlayNav">
+  <ul>
+    <li><a href="index.html">Accueil</a></li>
+    <li><a href="apropos.html">À propos</a></li>
+    <li><a href="competences.html">Compétences</a></li>
+    <li><a href="experiences.html">Expériences</a></li>
+    <li><a href="projets.html" class="active">Projets</a></li>
+    <li><a href="journal.html">Journal</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <div class="overlay-social">
+    <a href="mailto:mathieudome30@gmail.com" aria-label="Email">✉</a>
+    <a href="https://www.linkedin.com/in/mathieu-domenet-b147062aa/" target="_blank" rel="noopener" aria-label="LinkedIn">in</a>
+  </div>
+</nav>
+
+<main>
+  <section class="page-hero sky reveal">
+    <span class="eyebrow">Identité & Web</span>
+    <h1 class="section-title">MAISON AMBRE</h1>
+    <p class="page-sub">Nouvelle identité visuelle et site vitrine pour une maison de parfumerie artisanale.</p>
+  </section>
+  <div class="meta-row reveal">
+    <span class="meta-tag">Client : Maison Ambre</span>
+    <span class="meta-tag">Année : 2025</span>
+    <span class="meta-tag">Identité & Web</span>
+  </div>
+
+  <div class="project-body reveal">
+    <h2>Le contexte</h2>
+    <p>Maison Ambre, parfumerie artisanale installée à Nîmes, disposait d'un site vieillissant et d'une identité visuelle peu cohérente avec la qualité de ses créations.</p>
+    <h2>La mission</h2>
+    <p>Refonte complète de l'identité de marque (logo, palette, typographie) et conception d'un nouveau site vitrine optimisé pour le référencement naturel.</p>
+    <div class="gallery-grid">
+      <div class="card-media"></div>
+      <div class="card-media"></div>
+    </div>
+    <h2>Les résultats</h2>
+    <div class="result-strip">
+      <div class="stat"><span class="stat-number">+120%</span><span class="stat-label">Trafic organique en 6 mois</span></div>
+      <div class="stat"><span class="stat-number">x3</span><span class="stat-label">Pages vues par session</span></div>
+      <div class="stat"><span class="stat-number">+40</span><span class="stat-label">Mots-clés nouvellement positionnés</span></div>
+    </div>
+  </div>
+
+  <div class="page-nav">
+    <a href="projet-racine-avocats.html">← Cabinet Racine Avocats</a>
+    <a href="projet-nomade-traiteur.html">Nomade Traiteur →</a>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <span class="logo-footer">Mathieu<span class="logo-dots">¨</span></span>
+  <ul class="footer-sitemap">
+    <li><a href="index.html">Accueil</a></li>
+    <li><a href="apropos.html">À propos</a></li>
+    <li><a href="competences.html">Compétences</a></li>
+    <li><a href="experiences.html">Expériences</a></li>
+    <li><a href="projets.html">Projets</a></li>
+    <li><a href="journal.html">Journal</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <p>© 2026 Mathieu Domenet — Communication</p>
+</footer>
+
+<script src="scene3d.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

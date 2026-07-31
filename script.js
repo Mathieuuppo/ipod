@@ -30,6 +30,18 @@ if ('IntersectionObserver' in window && revealEls.length) {
   revealEls.forEach(el => el.classList.add('is-visible'));
 }
 
+// ── Contact form ─────────────────────────────────────────────────────
+const contactForm = document.getElementById('contactForm');
+contactForm?.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = contactForm.name.value;
+  const email = contactForm.email.value;
+  const message = contactForm.message.value;
+  const subject = encodeURIComponent(`Contact portfolio — ${name}`);
+  const body = encodeURIComponent(`${message}\n\n— ${name} (${email})`);
+  window.location.href = `mailto:mathieudome30@gmail.com?subject=${subject}&body=${body}`;
+});
+
 // ── Carousels ────────────────────────────────────────────────────────
 document.querySelectorAll('[data-carousel]').forEach(carousel => {
   const track = carousel.querySelector('.carousel-track');

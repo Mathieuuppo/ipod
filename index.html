@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mathieu Domenet — Communication</title>
+<meta name="description" content="Portfolio de Mathieu Domenet, chef de projet communication à Nîmes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Permanent+Marker&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="scene3d" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="site-header">
+  <a href="index.html" class="logo">Mathieu<span class="logo-dots">¨</span></a>
+  <button class="menu-toggle" id="menuToggle" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="overlayNav">
+    <span></span><span></span>
+  </button>
+</header>
+
+<nav class="overlay-nav" id="overlayNav">
+  <ul>
+    <li><a href="index.html" class="active">Accueil</a></li>
+    <li><a href="apropos.html">À propos</a></li>
+    <li><a href="competences.html">Compétences</a></li>
+    <li><a href="experiences.html">Expériences</a></li>
+    <li><a href="projets.html">Projets</a></li>
+    <li><a href="journal.html">Journal</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <div class="overlay-social">
+    <a href="mailto:mathieudome30@gmail.com" aria-label="Email">✉</a>
+    <a href="https://www.linkedin.com/in/mathieu-domenet-b147062aa/" target="_blank" rel="noopener" aria-label="LinkedIn">in</a>
+  </div>
+</nav>
+
+<main>
+
+  <section id="accueil" class="hero sky">
+    <div class="hero-inner">
+      <p class="lead-in">On m'a dit…</p>
+      <h1 class="statement">TU NE VAS<br>JAMAIS TROUVER</h1>
+      <p class="lead-in lead-in--sub">Et si j'arrêtais d'attendre ?</p>
+      <h1 class="statement">ET SI JE CRÉAIS<br>MA CHANCE ?</h1>
+
+      <div class="hero-cta">
+        <span class="status-badge"><span class="status-dot"></span>Disponible — Nîmes / Occitanie</span>
+        <span class="role">Mathieu Domenet — Chef de projet communication</span>
+        <div class="cta-buttons">
+          <a href="contact.html" class="btn">Me contacter</a>
+          <a href="cv-mathieu.pdf" class="btn btn-outline" download>Télécharger mon CV</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="marquee">
+    <div class="marquee-track">
+      <span>COMMUNICATION</span><span>•</span><span>STRATÉGIE DE CONTENU</span><span>•</span><span>RÉSEAUX SOCIAUX</span><span>•</span><span>ÉVÉNEMENTIEL</span><span>•</span><span>WORDPRESS</span><span>•</span><span>SEO</span><span>•</span>
+      <span>COMMUNICATION</span><span>•</span><span>STRATÉGIE DE CONTENU</span><span>•</span><span>RÉSEAUX SOCIAUX</span><span>•</span><span>ÉVÉNEMENTIEL</span><span>•</span><span>WORDPRESS</span><span>•</span><span>SEO</span><span>•</span>
+    </div>
+  </div>
+
+  <section class="section" style="padding-top:64px;">
+    <span class="eyebrow reveal">Portrait Vol. 1</span>
+    <div class="hero-cut reveal">
+      <h2 class="section-title" style="font-size:clamp(44px, 13vw, 128px);">DOMENET</h2>
+      <div class="cut-band"></div>
+    </div>
+  </section>
+
+  <div class="stats reveal">
+    <div class="stat"><span class="stat-number">40+</span><span class="stat-label">Projets menés</span></div>
+    <div class="stat"><span class="stat-number">15</span><span class="stat-label">Clients accompagnés</span></div>
+    <div class="stat"><span class="stat-number">3 ans</span><span class="stat-label">D'expérience terrain</span></div>
+    <div class="stat"><span class="stat-number">98%</span><span class="stat-label">Clients satisfaits</span></div>
+  </div>
+
+  <section class="section sky-alt">
+    <h2 class="section-title reveal">À PROPOS</h2>
+    <div class="about-grid">
+      <div class="photo-frame reveal">
+        <svg viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="78" r="38"/><path d="M30 190c0-45 31-72 70-72s70 27 70 72"/></svg>
+        <span class="photo-hint">Ta photo ici</span>
+      </div>
+      <div class="bio-text reveal">
+        <p>Diplômé d'un <strong>Master en Communication</strong>, je suis chef de projet en alternance chez <strong>Uppo Communication &amp; Formation</strong>, une agence basée à Beaucaire, près de Nîmes.</p>
+        <p>Curieux et toujours partant pour apprendre, j'aime transformer une idée en histoire qui parle vraiment aux gens.</p>
+        <a href="apropos.html" class="card-more">En savoir plus sur mon parcours →</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title reveal">PROJETS RÉCENTS</h2>
+    <div class="fan-stack reveal">
+      <a href="projet-maison-ambre.html" class="fan-card">
+        <figure><figcaption>Maison Ambre</figcaption></figure>
+      </a>
+      <a href="projet-nomade-traiteur.html" class="fan-card">
+        <figure><figcaption>Nomade Traiteur</figcaption></figure>
+      </a>
+      <a href="projet-festival-lumieres.html" class="fan-card">
+        <figure><figcaption>Festival Lumières du Gard</figcaption></figure>
+      </a>
+      <a href="projet-commercants-formation.html" class="fan-card">
+        <figure><figcaption>Réseau de 12 commerçants</figcaption></figure>
+      </a>
+      <a href="projet-studio-lumen.html" class="fan-card">
+        <figure><figcaption>Studio Lumen</figcaption></figure>
+      </a>
+    </div>
+    <p style="text-align:center; margin-top:56px;"><a href="projets.html" class="card-more">Voir tous les projets →</a></p>
+  </section>
+
+  <section class="section sky-alt">
+    <h2 class="section-title reveal">DERNIERS ARTICLES</h2>
+    <div class="grid-cards reveal">
+      <a href="article-reseaux-sociaux-pme.html" class="card-link">
+        <article class="card">
+          <span class="card-tag">12 mars 2026</span>
+          <h3>5 réflexes pour réussir ses réseaux sociaux en PME</h3>
+          <p class="card-desc">Pas besoin d'un gros budget pour exister sur les réseaux : voici les cinq réflexes qui font la différence au quotidien.</p>
+          <span class="card-more">Lire l'article →</span>
+        </article>
+      </a>
+      <a href="article-storytelling-marque.html" class="card-link">
+        <article class="card">
+          <span class="card-tag">2 février 2026</span>
+          <h3>Pourquoi le storytelling change tout pour une petite marque</h3>
+          <p class="card-desc">Une belle histoire vaut mieux qu'une longue liste d'arguments. Voici comment la construire sans en faire trop.</p>
+          <span class="card-more">Lire l'article →</span>
+        </article>
+      </a>
+      <a href="article-seo-debutant.html" class="card-link">
+        <article class="card">
+          <span class="card-tag">18 janvier 2026</span>
+          <h3>Le SEO expliqué simplement à ceux qui n'y comprennent rien</h3>
+          <p class="card-desc">Référencement naturel, mots-clés, backlinks... on démystifie le jargon en termes simples, sans blabla technique.</p>
+          <span class="card-more">Lire l'article →</span>
+        </article>
+      </a>
+    </div>
+    <p style="text-align:center; margin-top:36px;"><a href="journal.html" class="card-more">Voir le journal →</a></p>
+  </section>
+
+  <section class="section contact-section">
+    <h2 class="section-title reveal">ENVIE D'EN PARLER ?</h2>
+    <p class="contact-line reveal">Je suis disponible pour de nouvelles opportunités.</p>
+    <p class="reveal"><a href="contact.html" class="btn">Me contacter</a></p>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <span class="logo-footer">Mathieu<span class="logo-dots">¨</span></span>
+  <ul class="footer-sitemap">
+    <li><a href="index.html">Accueil</a></li>
+    <li><a href="apropos.html">À propos</a></li>
+    <li><a href="competences.html">Compétences</a></li>
+    <li><a href="experiences.html">Expériences</a></li>
+    <li><a href="projets.html">Projets</a></li>
+    <li><a href="journal.html">Journal</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <p>© 2026 Mathieu Domenet — Communication</p>
+</footer>
+
+<script src="scene3d.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

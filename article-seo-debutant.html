@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Le SEO expliqué simplement à ceux qui n'y comprennent rien — Journal</title>
+<meta name="description" content="Référencement naturel, mots-clés, backlinks... on démystifie le jargon en termes simples, sans blabla technique.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Permanent+Marker&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="scene3d" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="site-header">
+  <a href="index.html" class="logo">Mathieu<span class="logo-dots">¨</span></a>
+  <button class="menu-toggle" id="menuToggle" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="overlayNav">
+    <span></span><span></span>
+  </button>
+</header>
+
+<nav class="overlay-nav" id="overlayNav">
+  <ul>
+    <li><a href="index.html">Accueil</a></li>
+    <li><a href="apropos.html">À propos</a></li>
+    <li><a href="competences.html">Compétences</a></li>
+    <li><a href="experiences.html">Expériences</a></li>
+    <li><a href="projets.html">Projets</a></li>
+    <li><a href="journal.html" class="active">Journal</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <div class="overlay-social">
+    <a href="mailto:mathieudome30@gmail.com" aria-label="Email">✉</a>
+    <a href="https://www.linkedin.com/in/mathieu-domenet-b147062aa/" target="_blank" rel="noopener" aria-label="LinkedIn">in</a>
+  </div>
+</nav>
+
+<main>
+  <section class="page-hero sky reveal">
+    <span class="eyebrow">Journal</span>
+    <h1 class="section-title" style="font-size: clamp(28px, 6vw, 46px);">Le SEO expliqué simplement à ceux qui n'y comprennent rien</h1>
+  </section>
+
+  <div class="article-body reveal">
+    <span class="article-date">18 janvier 2026</span>
+    <p><em>Référencement naturel, mots-clés, backlinks... on démystifie le jargon en termes simples, sans blabla technique.</em></p>
+    <h2>Le SEO, c'est juste être trouvable</h2>
+    <p>Le référencement naturel, ce n'est rien de plus que rendre un site facile à trouver pour les moteurs de recherche et agréable à lire pour les humains qui tombent dessus.</p>
+    <h2>Les mots-clés : parler la langue de ses clients</h2>
+    <p>Il ne s'agit pas d'écrire pour Google, mais d'utiliser les mots que tapent réellement les clients potentiels quand ils cherchent une solution à leur problème.</p>
+    <h2>La technique compte, mais moins qu'on le croit</h2>
+    <p>Un site rapide et bien structuré aide, mais un contenu utile et régulièrement mis à jour reste le facteur qui pèse le plus lourd dans la durée.</p>
+    <h2>Les backlinks : la confiance des autres sites</h2>
+    <p>Chaque site qui fait un lien vers le vôtre est un peu comme une recommandation. Mieux vaut quelques recommandations sérieuses qu'un grand nombre de liens sans rapport.</p>
+  </div>
+
+  <div class="page-nav">
+    <a href="article-storytelling-marque.html">← Pourquoi le storytelling change tout pour une petite marque</a>
+    <a href="article-reseaux-sociaux-pme.html">5 réflexes pour réussir ses réseaux sociaux en PME →</a>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <span class="logo-footer">Mathieu<span class="logo-dots">¨</span></span>
+  <ul class="footer-sitemap">
+    <li><a href="index.html">Accueil</a></li>
+    <li><a href="apropos.html">À propos</a></li>
+    <li><a href="competences.html">Compétences</a></li>
+    <li><a href="experiences.html">Expériences</a></li>
+    <li><a href="projets.html">Projets</a></li>
+    <li><a href="journal.html">Journal</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <p>© 2026 Mathieu Domenet — Communication</p>
+</footer>
+
+<script src="scene3d.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Projets — Mathieu Domenet</title>
+<meta name="description" content="Projets de communication menés par Mathieu Domenet.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Permanent+Marker&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="scene3d" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="site-header">
+  <a href="index.html" class="logo">Mathieu<span class="logo-dots">¨</span></a>
+  <button class="menu-toggle" id="menuToggle" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="overlayNav">
+    <span></span><span></span>
+  </button>
+</header>
+
+<nav class="overlay-nav" id="overlayNav">
+  <ul>
+    <li><a href="index.html">Accueil</a></li>
+    <li><a href="apropos.html">À propos</a></li>
+    <li><a href="competences.html">Compétences</a></li>
+    <li><a href="experiences.html">Expériences</a></li>
+    <li><a href="projets.html" class="active">Projets</a></li>
+    <li><a href="journal.html">Journal</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <div class="overlay-social">
+    <a href="mailto:mathieudome30@gmail.com" aria-label="Email">✉</a>
+    <a href="https://www.linkedin.com/in/mathieu-domenet-b147062aa/" target="_blank" rel="noopener" aria-label="LinkedIn">in</a>
+  </div>
+</nav>
+
+<main>
+  <section class="page-hero sky reveal">
+    <span class="eyebrow">Cas clients</span>
+    <div class="hero-cut">
+      <h1 class="section-title">PROJETS</h1>
+      <div class="cut-band"></div>
+    </div>
+    <p class="page-sub">Une sélection de projets menés en agence : identité de marque, réseaux sociaux, événementiel, formation.</p>
+  </section>
+  <section class="section">
+    <div class="grid-cards reveal">
+      <a href="projet-maison-ambre.html" class="card-link">
+        <article class="card card--project">
+          <div class="card-media"></div>
+          <h3>Refonte identité & site — Maison Ambre</h3>
+          <p class="card-desc">Nouvelle identité visuelle et site vitrine pour une maison de parfumerie artisanale.</p>
+          <span class="card-more">Voir le projet →</span>
+        </article>
+      </a>
+      <a href="projet-nomade-traiteur.html" class="card-link">
+        <article class="card card--project">
+          <div class="card-media"></div>
+          <h3>Campagne réseaux sociaux — Nomade Traiteur</h3>
+          <p class="card-desc">Stratégie de contenu Instagram/TikTok sur 3 mois : recettes en vidéo, coulisses d'événements.</p>
+          <span class="card-more">Voir le projet →</span>
+        </article>
+      </a>
+      <a href="projet-festival-lumieres.html" class="card-link">
+        <article class="card card--project">
+          <div class="card-media"></div>
+          <h3>Reportage événementiel — Festival Lumières du Gard</h3>
+          <p class="card-desc">Captation photo, vidéo et drone sur 3 jours de festival, montage aftermovie diffusé à 40k vues.</p>
+          <span class="card-more">Voir le projet →</span>
+        </article>
+      </a>
+      <a href="projet-commercants-formation.html" class="card-link">
+        <article class="card card--project">
+          <div class="card-media"></div>
+          <h3>Formation digitale — Réseau de 12 commerçants</h3>
+          <p class="card-desc">Programme d'ateliers WordPress & réseaux sociaux pour des commerces de centre-ville, autonomie totale en 2 mois.</p>
+          <span class="card-more">Voir le projet →</span>
+        </article>
+      </a>
+      <a href="projet-studio-lumen.html" class="card-link">
+        <article class="card card--project">
+          <div class="card-media"></div>
+          <h3>Stratégie de marque — Studio Lumen</h3>
+          <p class="card-desc">Repositionnement de marque et ligne éditoriale pour un studio de création, storytelling fondateur, kit de communication complet.</p>
+          <span class="card-more">Voir le projet →</span>
+        </article>
+      </a>
+      <a href="projet-racine-avocats.html" class="card-link">
+        <article class="card card--project">
+          <div class="card-media"></div>
+          <h3>Newsletter & SEO — Cabinet Racine Avocats</h3>
+          <p class="card-desc">Refonte SEO du site et lancement d'une newsletter mensuelle, +45% de leads qualifiés en un trimestre.</p>
+          <span class="card-more">Voir le projet →</span>
+        </article>
+      </a>
+    </div>
+  </section>
+
+  <section class="section sky-alt contact-section">
+    <h2 class="section-title reveal">UN PROJET EN TÊTE ?</h2>
+    <p class="reveal"><a href="contact.html" class="btn">Me contacter</a></p>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <span class="logo-footer">Mathieu<span class="logo-dots">¨</span></span>
+  <ul class="footer-sitemap">
+    <li><a href="index.html">Accueil</a></li>
+    <li><a href="apropos.html">À propos</a></li>
+    <li><a href="competences.html">Compétences</a></li>
+    <li><a href="experiences.html">Expériences</a></li>
+    <li><a href="projets.html">Projets</a></li>
+    <li><a href="journal.html">Journal</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <p>© 2026 Mathieu Domenet — Communication</p>
+</footer>
+
+<script src="scene3d.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

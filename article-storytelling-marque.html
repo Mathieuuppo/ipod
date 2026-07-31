@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pourquoi le storytelling change tout pour une petite marque — Journal</title>
+<meta name="description" content="Une belle histoire vaut mieux qu'une longue liste d'arguments. Voici comment la construire sans en faire trop.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Permanent+Marker&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="scene3d" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="site-header">
+  <a href="index.html" class="logo">Mathieu<span class="logo-dots">¨</span></a>
+  <button class="menu-toggle" id="menuToggle" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="overlayNav">
+    <span></span><span></span>
+  </button>
+</header>
+
+<nav class="overlay-nav" id="overlayNav">
+  <ul>
+    <li><a href="index.html">Accueil</a></li>
+    <li><a href="apropos.html">À propos</a></li>
+    <li><a href="competences.html">Compétences</a></li>
+    <li><a href="experiences.html">Expériences</a></li>
+    <li><a href="projets.html">Projets</a></li>
+    <li><a href="journal.html" class="active">Journal</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <div class="overlay-social">
+    <a href="mailto:mathieudome30@gmail.com" aria-label="Email">✉</a>
+    <a href="https://www.linkedin.com/in/mathieu-domenet-b147062aa/" target="_blank" rel="noopener" aria-label="LinkedIn">in</a>
+  </div>
+</nav>
+
+<main>
+  <section class="page-hero sky reveal">
+    <span class="eyebrow">Journal</span>
+    <h1 class="section-title" style="font-size: clamp(28px, 6vw, 46px);">Pourquoi le storytelling change tout pour une petite marque</h1>
+  </section>
+
+  <div class="article-body reveal">
+    <span class="article-date">2 février 2026</span>
+    <p><em>Une belle histoire vaut mieux qu'une longue liste d'arguments. Voici comment la construire sans en faire trop.</em></p>
+    <h2>Une histoire, pas un argumentaire</h2>
+    <p>Personne ne se souvient d'une liste de caractéristiques techniques. On se souvient d'une raison d'être, d'un déclic, d'une intention. C'est ce fil-là qu'il faut trouver en premier.</p>
+    <h2>Partir du vrai, pas du vendeur</h2>
+    <p>Les meilleures histoires de marque sont souvent les plus simples : pourquoi cette personne a commencé, ce qu'elle a raté avant de réussir, ce qui la rend un peu têtue sur son métier.</p>
+    <h2>Une histoire se raconte partout, pas une fois</h2>
+    <p>Le récit fondateur n'est pas un texte qu'on écrit une fois pour la page « À propos » : il infuse le ton des réseaux sociaux, l'accueil client, jusqu'au packaging.</p>
+    <h2>Laisser de la place au client</h2>
+    <p>La marque n'est pas toujours l'héroïne de l'histoire. Souvent, le client l'est, et la marque n'est que l'outil qui l'aide à réussir sa propre histoire.</p>
+  </div>
+
+  <div class="page-nav">
+    <a href="article-reseaux-sociaux-pme.html">← 5 réflexes pour réussir ses réseaux sociaux en PME</a>
+    <a href="article-seo-debutant.html">Le SEO expliqué simplement à ceux qui n'y comprennent rien →</a>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <span class="logo-footer">Mathieu<span class="logo-dots">¨</span></span>
+  <ul class="footer-sitemap">
+    <li><a href="index.html">Accueil</a></li>
+    <li><a href="apropos.html">À propos</a></li>
+    <li><a href="competences.html">Compétences</a></li>
+    <li><a href="experiences.html">Expériences</a></li>
+    <li><a href="projets.html">Projets</a></li>
+    <li><a href="journal.html">Journal</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <p>© 2026 Mathieu Domenet — Communication</p>
+</footer>
+
+<script src="scene3d.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

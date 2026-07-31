@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reportage événementiel — Festival Lumières du Gard — Mathieu Domenet</title>
+<meta name="description" content="Captation photo, vidéo et drone sur 3 jours de festival, montage aftermovie diffusé à 40k vues.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Permanent+Marker&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="scene3d" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="site-header">
+  <a href="index.html" class="logo">Mathieu<span class="logo-dots">¨</span></a>
+  <button class="menu-toggle" id="menuToggle" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="overlayNav">
+    <span></span><span></span>
+  </button>
+</header>
+
+<nav class="overlay-nav" id="overlayNav">
+  <ul>
+    <li><a href="index.html">Accueil</a></li>
+    <li><a href="apropos.html">À propos</a></li>
+    <li><a href="competences.html">Compétences</a></li>
+    <li><a href="experiences.html">Expériences</a></li>
+    <li><a href="projets.html" class="active">Projets</a></li>
+    <li><a href="journal.html">Journal</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <div class="overlay-social">
+    <a href="mailto:mathieudome30@gmail.com" aria-label="Email">✉</a>
+    <a href="https://www.linkedin.com/in/mathieu-domenet-b147062aa/" target="_blank" rel="noopener" aria-label="LinkedIn">in</a>
+  </div>
+</nav>
+
+<main>
+  <section class="page-hero sky reveal">
+    <span class="eyebrow">Photo / Vidéo / Drone</span>
+    <div class="hero-cut">
+      <h1 class="section-title">FESTIVAL LUMIÈRES DU GARD</h1>
+      <div class="cut-band"></div>
+    </div>
+    <p class="page-sub">Captation photo, vidéo et drone sur 3 jours de festival, montage aftermovie diffusé à 40k vues.</p>
+  </section>
+  <div class="meta-row reveal">
+    <span class="meta-tag">Client : Festival Lumières du Gard</span>
+    <span class="meta-tag">Année : 2024</span>
+    <span class="meta-tag">Photo / Vidéo / Drone</span>
+  </div>
+
+  <div class="project-body reveal">
+    <h2>Le contexte</h2>
+    <p>Le festival souhaitait un aftermovie capable de nourrir sa communication l'année suivante et de convaincre de nouveaux partenaires.</p>
+    <h2>La mission</h2>
+    <p>Captation photo, vidéo et prises de vues aériennes par drone sur les trois jours de l'événement, puis montage d'un aftermovie de 90 secondes.</p>
+    <div class="gallery-grid">
+      <div class="card-media"></div>
+      <div class="card-media"></div>
+    </div>
+    <h2>Les résultats</h2>
+    <div class="result-strip">
+      <div class="stat"><span class="stat-number">40k</span><span class="stat-label">Vues sur l'aftermovie</span></div>
+      <div class="stat"><span class="stat-number">3</span><span class="stat-label">Jours de captation</span></div>
+      <div class="stat"><span class="stat-number">+15</span><span class="stat-label">Partenaires signés l'année suivante</span></div>
+    </div>
+  </div>
+
+  <div class="page-nav">
+    <a href="projet-nomade-traiteur.html">← Nomade Traiteur</a>
+    <a href="projet-commercants-formation.html">Réseau de 12 commerçants →</a>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <span class="logo-footer">Mathieu<span class="logo-dots">¨</span></span>
+  <ul class="footer-sitemap">
+    <li><a href="index.html">Accueil</a></li>
+    <li><a href="apropos.html">À propos</a></li>
+    <li><a href="competences.html">Compétences</a></li>
+    <li><a href="experiences.html">Expériences</a></li>
+    <li><a href="projets.html">Projets</a></li>
+    <li><a href="journal.html">Journal</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <p>© 2026 Mathieu Domenet — Communication</p>
+</footer>
+
+<script src="scene3d.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

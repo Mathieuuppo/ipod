@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>UPPO Vœux 2027</title>
+<style>
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  canvas { display: block; }
+  @font-face { font-family: 'Bagel Fat One'; src: url(assets/fonts/BagelFatOne.ttf); }
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// Carte de vœux animée UPPO 2027 — 15 s, rendu déterministe : render(t) dessine l'image à l'instant t (secondes).
+const W = 1920, H = 1080, CX = W / 2, CY = H / 2;
+const TQ = '#5fd8ca', TQ_DARK = '#2fb3a5', WHITE = '#ffffff', BLACK = '#0a0a0a';
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+
+// ---------- utilitaires ----------
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const eOutCubic = k => 1 - Math.pow(1 - k, 3);
+const eInCubic = k => k * k * k;
+const eInOutCubic = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const eOutExpo = k => k >= 1 ? 1 : 1 - Math.pow(2, -10 * k);
+const eInExpo = k => k <= 0 ? 0 : Math.pow(2, 10 * k - 10);
+const eOutBack = (k, s = 1.70158) => 1 + (s + 1) * Math.pow(k - 1, 3) + s * Math.pow(k - 1, 2);
+const eOutElastic = k => k === 0 ? 0 : k === 1 ? 1 : Math.pow(2, -10 * k) * Math.sin((k * 10 - .75) * (2 * Math.PI / 3)) + 1;
+function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+const FONT = (w, px, it = '') => `${it} ${w} ${px}px Inter, "Inter Display", sans-serif`;
+
+const imgs = {};
+function loadImg(k, src) { return new Promise(r => { const i = new Image(); i.onload = () => { imgs[k] = i; r(); }; i.src = src; }); }
+
+// ---------- impacts (tremblement caméra + flash) ----------
+const IMPACTS = [
+  { t: 1.00, shake: 38, flash: .9 },
+  { t: 2.90, shake: 46, flash: .7 },
+  { t: 3.25, shake: 14, flash: 0 },
+  { t: 3.60, shake: 14, flash: 0 },
+  { t: 4.62, shake: 24, flash: .5 },
+  { t: 12.05, shake: 30, flash: .85 },
+];
+function shakeAt(t) {
+  let x = 0, y = 0, r = 0;
+  for (const im of IMPACTS) {
+    const d = t - im.t; if (d < 0 || d > .6) continue;
+    const a = im.shake * Math.exp(-d * 9);
+    x += Math.sin(d * 97 + im.t) * a; y += Math.cos(d * 83 + im.t * 3) * a; r += Math.sin(d * 61) * a * .0009;
+  }
+  return { x, y, r };
+}
+function flashAt(t) {
+  let f = 0;
+  for (const im of IMPACTS) { const d = t - im.t; if (d >= 0 && d < .5) f = Math.max(f, im.flash * Math.exp(-d * 10)); }
+  return f;
+}
+
+// ---------- particules ----------
+function makeBurst(seed, n, x, y, t0, speed, colors, opts = {}) {
+  const r = rng(seed), ps = [];
+  for (let i = 0; i < n; i++) {
+    const a = r() * Math.PI * 2, v = speed * (.35 + r() * .9);
+    ps.push({ a, v, c: colors[Math.floor(r() * colors.length)], w: 2 + r() * 4, life: (opts.life || 1.4) * (.6 + r() * .6) });
+  }
+  return { ps, x, y, t0, drag: opts.drag || 2.6, grav: opts.grav ?? 260, streak: opts.streak ?? .05 };
+}
+function burstPos(b, p, d) {
+  const k = b.drag, f = (1 - Math.exp(-k * d)) / k;
+  return [b.x + Math.cos(p.a) * p.v * f, b.y + Math.sin(p.a) * p.v * f + .5 * b.grav * d * d];
+}
+function drawBurst(b, t) {
+  const d = t - b.t0; if (d < 0) return;
+  ctx.save(); ctx.lineCap = 'round'; ctx.globalCompositeOperation = 'lighter';
+  for (const p of b.ps) {
+    if (d > p.life) continue;
+    const life = 1 - d / p.life;
+    const [x1, y1] = burstPos(b, p, d), [x0, y0] = burstPos(b, p, Math.max(0, d - b.streak));
+    ctx.strokeStyle = p.c; ctx.globalAlpha = life; ctx.lineWidth = p.w * (.4 + life * .8);
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    if (life < .5 && Math.sin(d * 60 + p.a * 10) > .3) { // scintillement
+      ctx.fillStyle = WHITE; ctx.beginPath(); ctx.arc(x1, y1, p.w * .7, 0, 7); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+const BURST_INTRO = makeBurst(7, 220, CX, CY, 1.0, 2600, [TQ, TQ, WHITE, TQ_DARK], { drag: 3.2, grav: 120, life: 1.6, streak: .06 });
+const FIREWORKS = [
+  makeBurst(11, 140, 420, 330, 3.10, 1300, [TQ, WHITE], { life: 1.5 }),
+  makeBurst(12, 140, 1500, 300, 3.30, 1300, [WHITE, TQ], { life: 1.5 }),
+  makeBurst(13, 160, 1250, 820, 3.55, 1200, [TQ, TQ_DARK, WHITE], { life: 1.4 }),
+  makeBurst(14, 120, 640, 860, 3.75, 1100, [WHITE, TQ], { life: 1.3 }),
+  makeBurst(15, 180, CX, 260, 3.95, 1500, [TQ, WHITE], { life: 1.4 }),
+];
+const BURST_SEVEN = makeBurst(21, 160, 1335, CY, 2.90, 2200, [TQ, WHITE], { drag: 4, grav: 60, life: 1.0 });
+const BURST_LOGO = makeBurst(31, 200, CX, CY - 40, 12.05, 2400, [TQ, WHITE, TQ_DARK], { drag: 3.4, grav: 140, life: 1.5 });
+
+// confettis : trajectoire analytique (chute + flottement)
+function makeConfetti(seed, n, t0, spread = 1) {
+  const r = rng(seed), cs = [];
+  for (let i = 0; i < n; i++) cs.push({
+    x: r() * W, y: -40 - r() * 900 * spread, vy: 260 + r() * 260, sw: 30 + r() * 70, sf: 1.5 + r() * 3, ph: r() * 7,
+    rot: r() * 7, rv: (r() - .5) * 14, w: 10 + r() * 14, h: 6 + r() * 10, c: [TQ, WHITE, TQ, TQ_DARK, '#bff3ec'][Math.floor(r() * 5)],
+    t0: t0 + r() * .4,
+  });
+  return cs;
+}
+function drawConfetti(cs, t, alpha = 1) {
+  ctx.save();
+  for (const c of cs) {
+    const d = t - c.t0; if (d < 0) continue;
+    const y = c.y + c.vy * d, x = c.x + Math.sin(d * c.sf + c.ph) * c.sw;
+    if (y > H + 40) continue;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(c.rot + c.rv * d);
+    ctx.scale(1, Math.cos(d * c.sf * 2.3 + c.ph)); // effet 3D de retournement
+    ctx.globalAlpha = alpha; ctx.fillStyle = c.c; ctx.fillRect(-c.w / 2, -c.h / 2, c.w, c.h);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+const CONF_A = makeConfetti(41, 160, 3.0, 1.2);
+const CONF_B = makeConfetti(42, 220, 12.05, 1.4);
+
+// ---------- décors ----------
+function bgDark(t, glow = .35) {
+  ctx.fillStyle = BLACK; ctx.fillRect(-100, -100, W + 200, H + 200);
+  const g = ctx.createRadialGradient(CX, CY, 0, CX, CY, 1100);
+  g.addColorStop(0, `rgba(95,216,202,${glow * .35})`); g.addColorStop(.5, `rgba(95,216,202,${glow * .08})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(-100, -100, W + 200, H + 200);
+}
+function dotGrid(t, alpha, color = 'rgba(255,255,255,') {
+  ctx.save();
+  const off = (t * 40) % 60;
+  for (let x = -60; x < W + 60; x += 60) for (let y = -60; y < H + 60; y += 60) {
+    const dx = x + off - CX, dy = y + off * .5 - CY, d = Math.hypot(dx, dy);
+    const a = alpha * (0.25 + .75 * Math.max(0, Math.sin(d / 90 - t * 4)));
+    ctx.fillStyle = color + a + ')'; ctx.fillRect(x + off - 1.5, y + off * .5 - 1.5, 3, 3);
+  }
+  ctx.restore();
+}
+function speedLines(t, t0, dur, seed, color = WHITE) {
+  const k = prog(t, t0, t0 + dur); if (k <= 0 || k >= 1) return;
+  const r = rng(seed); ctx.save(); ctx.strokeStyle = color; ctx.lineCap = 'round';
+  for (let i = 0; i < 60; i++) {
+    const a = r() * Math.PI * 2, r0 = 120 + r() * 300, len = 200 + r() * 700;
+    const p = eOutExpo(k), s = r0 + p * 1300, e = s + len * (1 - k);
+    ctx.globalAlpha = (1 - k) * .9; ctx.lineWidth = 1 + r() * 4;
+    ctx.beginPath(); ctx.moveTo(CX + Math.cos(a) * s, CY + Math.sin(a) * s); ctx.lineTo(CX + Math.cos(a) * e, CY + Math.sin(a) * e); ctx.stroke();
+  }
+  ctx.restore();
+}
+function ring(x, y, rad, w, color, alpha) {
+  if (alpha <= 0 || w <= 0) return;
+  ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = color; ctx.lineWidth = w;
+  ctx.beginPath(); ctx.arc(x, y, Math.max(0, rad), 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+}
+function shockwave(t, t0, x, y, maxR, color = TQ, w0 = 60) {
+  const k = prog(t, t0, t0 + .9); if (k <= 0 || k >= 1) return;
+  ring(x, y, eOutExpo(k) * maxR, w0 * (1 - k), color, 1 - k);
+  ring(x, y, eOutExpo(prog(t, t0 + .08, t0 + 1)) * maxR * .7, w0 * .3 * (1 - k), WHITE, (1 - k) * .8);
+}
+// chiffre « ruban » : face blanche + revers turquoise qui oscille (phase en radians)
+const RIB = (px) => `${px}px "Bagel Fat One"`;
+const ribCache = document.createElement('canvas');
+function ribbonDigit(ch, x, y, size, phase, glitch = 0, tint = null) {
+  const S = Math.ceil(size * 1.4);
+  ribCache.width = S; ribCache.height = S;
+  const o = ribCache.getContext('2d');
+  o.font = RIB(size); o.textAlign = 'center'; o.textBaseline = 'middle';
+  const c = S / 2, off = size * .13;
+  // revers turquoise
+  const g = o.createLinearGradient(0, 0, S, S);
+  g.addColorStop(0, '#7ff0e3'); g.addColorStop(.5, '#3fcfc4'); g.addColorStop(1, '#23a99d');
+  o.fillStyle = tint || g; o.fillText(ch, c, c);
+  // face blanche décalée → croissant turquoise sur un bord de chaque trait
+  o.globalCompositeOperation = 'source-atop';
+  o.fillStyle = tint ? 'rgba(255,255,255,.25)' : WHITE;
+  // le revers oscille autour du coin haut-droit, comme un ruban qui se tord
+  const a = -.6 + Math.sin(phase) * .55;
+  o.fillText(ch, c - Math.cos(a) * off, c - Math.sin(a) * off);
+  if (glitch > 0) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .7;
+    ctx.font = RIB(size); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ff0050'; ctx.fillText(ch, x - glitch, y);
+    ctx.fillStyle = '#00ffe6'; ctx.fillText(ch, x + glitch, y);
+    ctx.restore();
+  }
+  ctx.drawImage(ribCache, x - c, y - c);
+}
+
+// texte avec décalage RVB (glitch)
+function glitchText(txt, x, y, amt, t) {
+  if (amt > 0) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(255,0,80,.75)'; ctx.fillText(txt, x - amt, y + Math.sin(t * 90) * amt * .3);
+    ctx.fillStyle = 'rgba(0,255,230,.75)'; ctx.fillText(txt, x + amt, y - Math.sin(t * 70) * amt * .3);
+    ctx.restore();
+  }
+  ctx.fillText(txt, x, y);
+}
+
+// ---------- SCÈNE 1 : la goutte turquoise qui explose (0 → 1.4 s) ----------
+function scene1(t) {
+  bgDark(t, prog(t, .8, 1.0) * .4);
+  dotGrid(t, .05 + prog(t, 1, 1.3) * .08);
+  // chute
+  if (t < 1.0) {
+    const k = prog(t, .05, .72), fall = eInCubic(k);
+    let y = lerp(-120, CY, fall), sx = 1, sy = 1 + fall * 1.2;
+    if (t >= .72) { // écrasement puis gonflement avant explosion
+      const s = prog(t, .72, 1.0); y = CY;
+      sx = 1 + Math.sin(s * Math.PI) * .6 + eInExpo(s) * 1.5; sy = 1 - Math.sin(s * Math.PI) * .45 + eInExpo(s) * 1.5;
+    }
+    // traînée
+    if (t < .72) for (let i = 6; i > 0; i--) {
+      ctx.globalAlpha = .12 * (6 - i) / 6; ctx.fillStyle = TQ;
+      ctx.beginPath(); ctx.ellipse(CX, y - i * 40 * fall, 46, 46 * sy, 0, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.save(); ctx.shadowColor = TQ; ctx.shadowBlur = 40 + prog(t, .72, 1) * 120;
+    ctx.fillStyle = TQ; ctx.beginPath(); ctx.ellipse(CX, y, 46 * sx, 46 * sy, 0, 0, 7); ctx.fill(); ctx.restore();
+    // anneaux d'aspiration
+    if (t > .72) { const s = prog(t, .72, 1); ring(CX, CY, lerp(420, 60, eInCubic(s)), 4, TQ, s); ring(CX, CY, lerp(620, 90, eInCubic(s)), 2, WHITE, s * .6); }
+  }
+  shockwave(t, 1.0, CX, CY, 1500, TQ, 90);
+  speedLines(t, 1.0, .7, 3);
+  drawBurst(BURST_INTRO, t);
+}
+
+// ---------- SCÈNE 2 : 2026 → 2027 (1.1 → 4.7 s) ----------
+function scene2(t) {
+  bgDark(t, .45 + Math.sin(t * 6) * .05);
+  dotGrid(t, .1);
+  // bandes turquoise diagonales qui traversent
+  ctx.save(); ctx.translate(CX, CY); ctx.rotate(-.35);
+  for (let i = 0; i < 5; i++) {
+    const k = prog(t, 1.1 + i * .05, 1.7 + i * .05), x = lerp(-2600, 2600, eInOutCubic(k));
+    ctx.fillStyle = i % 2 ? WHITE : TQ; ctx.globalAlpha = .9;
+    ctx.fillRect(x - 200, -900 + i * 380, 400 + i * 60, 30 + i * 12);
+  }
+  ctx.restore(); ctx.globalAlpha = 1;
+
+  drawBurst(BURST_INTRO, t);
+  FIREWORKS.forEach(b => drawBurst(b, t));
+
+  // chiffres
+  const zoomOut = eInExpo(prog(t, 4.2, 4.7));
+  const pulse = 1 + (t > 2.9 ? Math.max(0, Math.sin((t - 2.9) * 20) * Math.exp(-(t - 2.9) * 6) * .08) : 0);
+  const baseScale = lerp(1, 1.18, eOutCubic(prog(t, 3.0, 4.2))) * (1 + zoomOut * 14) * pulse;
+  ctx.save(); ctx.translate(CX, CY); ctx.scale(baseScale, baseScale); ctx.translate(-CX, -CY);
+  ctx.font = FONT(900, 360); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const digits = ['2', '0', '2'], gap = 250, x0 = CX - gap * 1.5;
+  const glitch = t > 2.75 && t < 3.15 ? (Math.sin(t * 140) > 0 ? 18 : 6) : (t > 4.0 ? eInExpo(prog(t, 4.0, 4.6)) * 30 : 0);
+  digits.forEach((d, i) => {
+    const k = prog(t, 1.15 + i * .1, 1.75 + i * .1);
+    const y = lerp(H + 300, CY, eOutBack(k, 2.2));
+    ctx.save(); ctx.translate(x0 + gap * i, y); ctx.rotate((1 - eOutCubic(k)) * (i - 1) * .6);
+    ribbonDigit(d, 0, 0, 400, t * 2.2 + i * 1.3, glitch); ctx.restore();
+  });
+  // le 6 arrive puis se fait éjecter
+  const x6 = x0 + gap * 3;
+  if (t < 3.3) {
+    const kIn = prog(t, 1.45, 2.05);
+    const kOut = prog(t, 2.55, 3.3);
+    const shakeTremble = t > 2.2 && t < 2.6 ? Math.sin(t * 120) * 6 * prog(t, 2.2, 2.55) : 0;
+    const y = lerp(H + 300, CY, eOutBack(kIn, 2.2)) + eInCubic(kOut) * 900 - Math.sin(kOut * Math.PI) * 150;
+    ctx.save(); ctx.translate(x6 + shakeTremble + kOut * 420, y); ctx.rotate(kOut * 2.6);
+    ctx.globalAlpha = 1 - kOut * .6;
+    ribbonDigit('6', 0, 0, 400, t * 2.2 + 3.9, 0, kOut > 0 ? '#555' : null); ctx.restore();
+  }
+  // le 7 tombe du ciel et frappe
+  if (t > 2.55) {
+    const k = prog(t, 2.55, 2.9);
+    const y = lerp(-500, CY, eInCubic(k));
+    const sq = t > 2.9 ? 1 - Math.sin(prog(t, 2.9, 3.1) * Math.PI) * .25 : 1 + k * .25;
+    ctx.save(); ctx.translate(x6, y + 130); ctx.scale(1 / sq, sq); ctx.translate(0, -130);
+    ctx.shadowColor = TQ; ctx.shadowBlur = t > 2.9 ? 60 * (1 - prog(t, 2.9, 3.6)) + 25 : 0;
+    ribbonDigit('7', 0, 0, 400, t * 2.2 + 3.9, glitch);
+    ctx.restore();
+    if (k < 1) { // traînée de vitesse
+      ctx.save(); ctx.globalAlpha = .35; ctx.fillStyle = TQ;
+      ctx.fillRect(x6 - 90, y - 600, 180, 420); ctx.restore();
+    }
+  }
+  ctx.restore();
+  shockwave(t, 2.9, x6, CY, 1300, TQ, 70);
+  drawBurst(BURST_SEVEN, t);
+  speedLines(t, 2.9, .6, 9, TQ);
+  // sous-titre
+  const sk = prog(t, 3.2, 3.6);
+  if (sk > 0 && t < 4.3) {
+    ctx.save(); ctx.globalAlpha = sk * (1 - prog(t, 4.0, 4.3)); ctx.font = FONT(700, 34); ctx.textAlign = 'center';
+    ctx.fillStyle = TQ; ctx.letterSpacing = lerp(40, 22, eOutCubic(sk)) + 'px';
+    ctx.fillText('UNE NOUVELLE ANNÉE COMMENCE', CX, CY + 290); ctx.restore();
+  }
+  drawConfetti(CONF_A, t, 1 - prog(t, 4.3, 4.6));
+}
+
+// ---------- SCÈNE 3 : BONNE ANNÉE sur fond turquoise (4.4 → 7.1 s) ----------
+function scene3(t) {
+  ctx.fillStyle = TQ; ctx.fillRect(-100, -100, W + 200, H + 200);
+  // rayons rotatifs
+  ctx.save(); ctx.translate(CX, CY); ctx.rotate(t * .25);
+  ctx.fillStyle = 'rgba(255,255,255,.12)';
+  for (let i = 0; i < 18; i++) { ctx.rotate(Math.PI * 2 / 18); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(2000, -110); ctx.lineTo(2000, 110); ctx.fill(); }
+  ctx.restore();
+  dotGrid(t, .25, 'rgba(10,10,10,');
+  // bandeau noir incliné
+  const bk = eOutExpo(prog(t, 4.75, 5.25));
+  ctx.save(); ctx.translate(CX, CY + 10); ctx.rotate(-.06);
+  ctx.fillStyle = BLACK; ctx.fillRect(-W * bk * .62, 30, W * bk * 1.24, 200);
+  ctx.restore();
+
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  // BONNE : lettres qui tombent
+  ctx.font = FONT(900, 250);
+  const w1 = 'BONNE', sp1 = 175, s1 = CX - sp1 * 2;
+  [...w1].forEach((ch, i) => {
+    const k = prog(t, 4.65 + i * .06, 5.15 + i * .06);
+    const y = lerp(-300, CY - 30, eOutBack(k, 2.5));
+    ctx.save(); ctx.translate(s1 + sp1 * i, y); ctx.rotate((1 - k) * (i % 2 ? .5 : -.5));
+    ctx.fillStyle = BLACK; ctx.fillText(ch, 0, 0); ctx.restore();
+  });
+  // ANNÉE : lettres qui montent dans le bandeau
+  ctx.font = FONT(900, 170);
+  const w2 = 'ANNÉE', ws2 = [...w2].map(ch => ctx.measureText(ch).width + 6);
+  const tot2 = ws2.reduce((x, y) => x + y, 0);
+  ctx.save(); ctx.translate(CX, CY + 10); ctx.rotate(-.06); ctx.translate(-CX, -CY - 10);
+  ctx.beginPath(); ctx.rect(0, CY + 40, W, 200); ctx.clip();
+  [...w2].forEach((ch, i) => {
+    const k = prog(t, 5.0 + i * .06, 5.45 + i * .06);
+    const y = lerp(CY + 420, CY + 200, eOutBack(k, 1.8));
+    const x = CX - tot2 / 2 + ws2.slice(0, i).reduce((p, q) => p + q, 0) + ws2[i] / 2;
+    ctx.fillStyle = i === 3 ? TQ : WHITE; ctx.fillText(ch, x, y);
+  });
+  ctx.restore();
+  // étincelles ✦
+  const r = rng(77);
+  for (let i = 0; i < 14; i++) {
+    const x = r() * W, y = r() * H, t0 = 5.2 + r() * 1.3, k = prog(t, t0, t0 + .5);
+    if (k <= 0 || k >= 1) continue;
+    const s = Math.sin(k * Math.PI) * (18 + r() * 26);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(k * 2); ctx.fillStyle = i % 3 ? WHITE : BLACK;
+    ctx.beginPath(); for (let j = 0; j < 4; j++) { ctx.rotate(Math.PI / 2); ctx.lineTo(0, -s); ctx.lineTo(s * .22, -s * .22); } ctx.fill(); ctx.restore();
+  }
+  // petite ligne de sous-titre
+  const sk = prog(t, 5.6, 6.0);
+  ctx.save(); ctx.globalAlpha = sk; ctx.font = FONT(800, 36); ctx.fillStyle = BLACK; ctx.letterSpacing = '18px';
+  ctx.fillText('★  2 0 2 7  ★', CX, CY + 360 + (1 - eOutCubic(sk)) * 40); ctx.restore();
+}
+
+// ---------- SCÈNE 4 : le mot de Sébastien (6.8 → 12.0 s) ----------
+const MSG = [
+  { txt: 'Chers clients, partenaires et collaborateurs,', size: 40, w: 500, color: '#9aa', t: 7.15, y: 310 },
+  { txt: 'Que 2027 soit l’année', size: 92, w: 900, color: WHITE, t: 7.7, y: 440 },
+  { txt: 'de toutes les audaces !', size: 92, w: 900, color: TQ, t: 8.05, y: 548 },
+  { txt: 'Merci pour votre confiance et votre énergie.', size: 44, w: 600, color: WHITE, t: 8.9, y: 660 },
+  { txt: 'Belle et heureuse année à toutes et à tous.', size: 44, w: 600, color: WHITE, t: 9.3, y: 722 },
+];
+function scene4(t) {
+  bgDark(t, .25);
+  // grand 2027 en contour qui dérive en fond
+  ctx.save(); ctx.font = FONT(900, 620); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.strokeStyle = 'rgba(95,216,202,.10)'; ctx.lineWidth = 3;
+  ctx.strokeText('2027', CX + 300 - (t - 7) * 60, CY + 40); ctx.restore();
+  // formes flottantes
+  const r = rng(99);
+  for (let i = 0; i < 16; i++) {
+    const x = r() * W, y = r() * H, sp = 20 + r() * 50, kind = Math.floor(r() * 3), sz = 14 + r() * 40, ph = r() * 7;
+    const yy = y - (t - 7) * sp, xx = x + Math.sin(t + ph) * 20;
+    ctx.save(); ctx.translate(xx, yy); ctx.rotate(t * .6 + ph); ctx.globalAlpha = .25 + .2 * Math.sin(t * 2 + ph);
+    ctx.strokeStyle = i % 4 ? TQ : WHITE; ctx.lineWidth = 3;
+    if (kind === 0) { ctx.beginPath(); ctx.arc(0, 0, sz, 0, 7); ctx.stroke(); }
+    else if (kind === 1) { ctx.beginPath(); ctx.moveTo(-sz, 0); ctx.lineTo(sz, 0); ctx.moveTo(0, -sz); ctx.lineTo(0, sz); ctx.stroke(); }
+    else { ctx.strokeRect(-sz / 2, -sz / 2, sz, sz); }
+    ctx.restore();
+  }
+  // barre verticale turquoise à gauche du texte
+  const left = 260;
+  const bk = eOutExpo(prog(t, 7.0, 7.6));
+  ctx.fillStyle = TQ; ctx.fillRect(left - 60, 200, 10, 680 * bk);
+  // étiquette
+  const lk = prog(t, 7.0, 7.4);
+  ctx.save(); ctx.globalAlpha = lk; ctx.font = FONT(800, 26); ctx.fillStyle = TQ; ctx.letterSpacing = '10px'; ctx.textBaseline = 'alphabetic';
+  ctx.fillText('LE MOT DU DIRECTEUR GÉNÉRAL', left + (1 - eOutCubic(lk)) * -60, 225); ctx.restore();
+
+  // lignes du message : révélation masquée mot par mot
+  for (const line of MSG) {
+    const y = line.y;
+    ctx.font = FONT(line.w, line.size); ctx.textBaseline = 'alphabetic';
+    const words = line.txt.split(' ');
+    let x = left;
+    const lh = line.size * 1.18;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, y - line.size * 1.05, W, lh + 10); ctx.clip();
+    words.forEach((wd, i) => {
+      const k = prog(t, line.t + i * .045, line.t + i * .045 + .45);
+      const ww = ctx.measureText(wd + ' ').width;
+      if (k > 0) {
+        ctx.save(); ctx.globalAlpha = k; ctx.fillStyle = line.color;
+        ctx.fillText(wd, x, y + (1 - eOutExpo(k)) * lh); ctx.restore();
+      }
+      x += ww;
+    });
+    ctx.restore();
+  }
+  // signature
+  const sk = prog(t, 10.0, 10.5);
+  if (sk > 0) {
+    const sy = 850;
+    ctx.save(); ctx.globalAlpha = sk;
+    ctx.font = FONT(900, 72, 'italic'); ctx.fillStyle = WHITE;
+    ctx.fillText('Sébastien', left + (1 - eOutCubic(sk)) * 80, sy);
+    const sw = ctx.measureText('Sébastien').width;
+    // paraphe dessiné
+    const pk = eInOutCubic(prog(t, 10.25, 10.95));
+    ctx.strokeStyle = TQ; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath();
+    const N = 60;
+    for (let i = 0; i <= N * pk; i++) {
+      const u = i / N, px = left - 10 + u * (sw + 60), py = sy + 26 + Math.sin(u * Math.PI * 1.2) * -12 + Math.sin(u * 14) * 3 * u;
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.stroke();
+    ctx.font = FONT(600, 28); ctx.fillStyle = '#9aa'; ctx.letterSpacing = '4px';
+    ctx.globalAlpha = prog(t, 10.5, 10.9);
+    ctx.fillText('DIRECTEUR GÉNÉRAL — UPPO', left + sw + 90, sy - 8);
+    ctx.restore();
+  }
+  // transition de sortie : le point turquoise revient et aspire tout
+  const ok = prog(t, 11.45, 12.05);
+  if (ok > 0) {
+    ctx.save(); ctx.fillStyle = TQ; ctx.beginPath(); ctx.arc(CX, CY, lerp(10, 1300, eInExpo(ok)), 0, 7); ctx.fill(); ctx.restore();
+  }
+}
+
+// ---------- SCÈNE 5 : révélation logo (12.0 → 15 s) ----------
+function scene5(t) {
+  bgDark(t, .5 * prog(t, 12.0, 12.6));
+  dotGrid(t, .08);
+  // éclat de rayons derrière le logo
+  ctx.save(); ctx.translate(CX, CY - 60); ctx.rotate(t * .15);
+  const rk = eOutCubic(prog(t, 12.0, 12.8));
+  ctx.fillStyle = 'rgba(95,216,202,.07)';
+  for (let i = 0; i < 24; i++) { ctx.rotate(Math.PI / 12); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(1600 * rk, -60); ctx.lineTo(1600 * rk, 60); ctx.fill(); }
+  ctx.restore();
+
+  shockwave(t, 12.05, CX, CY - 40, 1500, TQ, 80);
+  speedLines(t, 12.05, .7, 13, TQ);
+  drawBurst(BURST_LOGO, t);
+
+  // logo principal
+  const L = imgs.uppo, lw = 1060, lh = lw * L.height / L.width;
+  const lx = CX - lw / 2, ly = CY - 120 - lh / 2;
+  const k = prog(t, 12.05, 12.75);
+  const s = lerp(.55, 1, eOutBack(k, 1.6)) * lerp(1, 1.04, prog(t, 12.8, 15));
+  ctx.save(); ctx.translate(CX, CY - 120); ctx.scale(s, s); ctx.translate(-CX, -CY + 120);
+  // révélation en cercle depuis le point du "U"
+  const dotX = lx + lw * 470 / 2000, dotY = ly + lh * 105 / 667;
+  ctx.save(); ctx.beginPath(); ctx.arc(dotX, dotY, eOutExpo(k) * 1400, 0, 7); ctx.clip();
+  ctx.globalAlpha = clamp(k * 3);
+  ctx.drawImage(L, lx, ly, lw, lh);
+  ctx.restore();
+  // reflet brillant qui balaie le logo
+  const sh = prog(t, 13.5, 14.2);
+  if (sh > 0 && sh < 1) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const off = document.createElement('canvas'); // calque masqué par la forme du logo
+    off.width = lw; off.height = lh; const o = off.getContext('2d');
+    o.drawImage(L, 0, 0, lw, lh); o.globalCompositeOperation = 'source-in';
+    const gx = lerp(-300, lw + 300, eInOutCubic(sh));
+    const g = o.createLinearGradient(gx - 160, 0, gx + 160, lh * .3);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(.5, 'rgba(255,255,255,.85)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    o.fillStyle = g; o.fillRect(0, 0, lw, lh);
+    ctx.drawImage(off, lx, ly); ctx.restore();
+  }
+  ctx.restore();
+
+  // MEILLEURS VŒUX 2027
+  const mk = prog(t, 12.65, 13.2);
+  if (mk > 0) {
+    ctx.save(); ctx.font = FONT(900, 64); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.letterSpacing = lerp(60, 16, eOutExpo(mk)) + 'px'; ctx.globalAlpha = mk;
+    ctx.fillStyle = WHITE; ctx.fillText('MEILLEURS VŒUX', CX - 120, CY + 150);
+    ctx.fillStyle = TQ; ctx.letterSpacing = '16px';
+    const mw = ctx.measureText('MEILLEURS VŒUX ').width;
+    ctx.fillText('2027', CX - 120 + mw / 2 + 130, CY + 150);
+    ctx.restore();
+    // soulignement
+    const uk = eOutExpo(prog(t, 12.9, 13.5));
+    ctx.fillStyle = TQ; ctx.fillRect(CX - 360 * uk, CY + 205, 720 * uk, 5);
+  }
+  // logos partenaires
+  const pk = prog(t, 13.3, 13.9);
+  if (pk > 0) {
+    const yb = CY + 330 + (1 - eOutCubic(pk)) * 60;
+    ctx.save(); ctx.globalAlpha = pk;
+    const F = imgs.formation, fh = 110, fw = fh * F.width / F.height;
+    const M = imgs.selfie, mh = 92, mw2 = mh * M.width / M.height;
+    const gap = 140, total = fw + gap + mw2, x0 = CX - total / 2;
+    ctx.drawImage(F, x0, yb - fh / 2, fw, fh);
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(x0 + fw + gap / 2 - 1, yb - 45, 2, 90);
+    ctx.drawImage(M, x0 + fw + gap, yb - mh / 2, mw2, mh);
+    ctx.restore();
+  }
+  drawConfetti(CONF_B, t);
+}
+
+// ---------- transitions ----------
+function render(t) {
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.letterSpacing = '0px';
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  const sk = shakeAt(t);
+  ctx.translate(CX + sk.x, CY + sk.y); ctx.rotate(sk.r); ctx.translate(-CX, -CY);
+
+  if (t < 1.1) scene1(t);
+  else if (t < 4.6) scene2(t);
+  else if (t < 6.85) scene3(t);
+  else if (t < 12.05) scene4(t);
+  else scene5(t);
+
+  // transition 2 → 3 : cercle turquoise qui envahit l'écran (depuis le 0 de 2027)
+  const c1 = prog(t, 4.3, 4.6);
+  if (c1 > 0 && t < 4.6) { ctx.fillStyle = TQ; ctx.beginPath(); ctx.arc(CX, CY, eInExpo(c1) * 1300, 0, 7); ctx.fill(); }
+  // transition 3 → 4 : volet noir en biais
+  const c2 = prog(t, 6.5, 6.85), c2b = prog(t, 6.85, 7.2);
+  if (c2 > 0 && t < 6.85) {
+    ctx.save(); ctx.fillStyle = BLACK; ctx.beginPath();
+    const x = lerp(-W * 1.6, 0, eInOutCubic(c2));
+    ctx.moveTo(x, -50); ctx.lineTo(x + W * 1.3, -50); ctx.lineTo(x + W * 1.6, H + 50); ctx.lineTo(x - 300, H + 50); ctx.fill();
+    ctx.restore();
+  }
+  if (c2b > 0 && c2b < 1) { // lame turquoise qui finit de passer
+    ctx.save(); ctx.fillStyle = TQ; const x = lerp(-200, W + 400, eInOutCubic(c2b));
+    ctx.beginPath(); ctx.moveTo(x, -50); ctx.lineTo(x + 60, -50); ctx.lineTo(x - 240, H + 50); ctx.lineTo(x - 300, H + 50); ctx.fill(); ctx.restore();
+  }
+  ctx.restore();
+
+  // flash blanc
+  const f = flashAt(t);
+  if (f > 0) { ctx.fillStyle = `rgba(255,255,255,${f})`; ctx.fillRect(0, 0, W, H); }
+  // vignette + grain
+  const v = ctx.createRadialGradient(CX, CY, 500, CX, CY, 1200);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.45)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  const gr = rng(Math.floor(t * 60) + 1);
+  ctx.fillStyle = 'rgba(255,255,255,.035)';
+  for (let i = 0; i < 700; i++) ctx.fillRect(gr() * W, gr() * H, 2, 2);
+}
+
+window.ready = (async () => {
+  await Promise.all([
+    loadImg('uppo', 'assets/uppo.webp'),
+    loadImg('formation', 'assets/uppo-formation-white.png'),
+    loadImg('selfie', 'assets/maselfiebox.png'),
+    document.fonts.load(FONT(900, 100)), document.fonts.load(RIB(100)), document.fonts.load(FONT(900, 100, 'italic')),
+    document.fonts.load(FONT(500, 40)), document.fonts.load(FONT(600, 40)), document.fonts.load(FONT(700, 40)), document.fonts.load(FONT(800, 40)),
+  ]);
+  window.render = render;
+  // aperçu en temps réel quand on ouvre la page dans un navigateur (?static désactive la lecture)
+  if (!location.search.includes('static')) {
+    const start = performance.now();
+    const loop = () => { render(((performance.now() - start) / 1000) % 15); requestAnimationFrame(loop); };
+    loop();
+  }
+})();
+</script>
+</body>
+</html>

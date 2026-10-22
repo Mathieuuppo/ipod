@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>UPPO Vœux 2027 3D</title>
+<style>html, body { margin: 0; background: #000; overflow: hidden; } canvas { display: block; }</style>
+<script type="importmap">
+{ "imports": {
+  "three": "./node_modules/three/build/three.module.js",
+  "three/addons/": "./node_modules/three/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<script type="module">
+// Carte de vœux UPPO 2027 en 3D — 45 s, rendu déterministe : render(t) dessine l'image à l'instant t (secondes).
+import * as THREE from 'three';
+import { TTFLoader } from 'three/addons/loaders/TTFLoader.js';
+import { Font } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const W = 1920, H = 1080, DUR = 45;
+const TQ = 0x4fd6c8;
+
+// ---------- utilitaires ----------
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const eOutCubic = k => 1 - Math.pow(1 - k, 3);
+const eInCubic = k => k * k * k;
+const eInOutCubic = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const eInOutSine = k => -(Math.cos(Math.PI * k) - 1) / 2;
+const eOutExpo = k => k >= 1 ? 1 : 1 - Math.pow(2, -10 * k);
+const eOutBack = (k, s = 1.70158) => 1 + (s + 1) * Math.pow(k - 1, 3) + s * Math.pow(k - 1, 2);
+function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+// chute avec rebonds amortis depuis la hauteur h (dt < 0 : avant l'apogée, pour les lancers vers le haut)
+function bounce(dt, h, g = 30, e = .42, n = 4) {
+  let v = Math.sqrt(2 * g * h); const T = v / g;
+  if (dt < T) return { y: h - .5 * g * dt * dt, since: -1 };
+  dt -= T; v *= e;
+  for (let i = 0; i < n; i++) {
+    const tb = 2 * v / g;
+    if (dt < tb) return { y: v * dt - .5 * g * dt * dt, since: dt };
+    dt -= tb; v *= e;
+  }
+  return { y: 0, since: dt + 10 };
+}
+const squash = since => since < 0 ? 0 : Math.exp(-since * 14) * Math.cos(since * 30);
+
+// ---------- moteur ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+renderer.domElement.id = 'c';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x020303);
+scene.fog = new THREE.Fog(0x020303, 22, 55);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture;
+scene.environmentIntensity = .18; // reflets discrets : le sol reste noir brillant
+
+const camera = new THREE.PerspectiveCamera(35, W / H, .1, 200);
+const rt = new THREE.WebGLRenderTarget(W, H, { samples: 4, type: THREE.HalfFloatType });
+const composer = new EffectComposer(renderer, rt);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), .45, .45, 1.15);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// ---------- matériaux ----------
+const M = {
+  white: new THREE.MeshPhysicalMaterial({ color: 0xf4f7f7, roughness: .3, clearcoat: 1, clearcoatRoughness: .15, envMapIntensity: .45 }),
+  tq: new THREE.MeshPhysicalMaterial({ color: TQ, roughness: .22, metalness: .25, clearcoat: 1, clearcoatRoughness: .1, envMapIntensity: 1 }),
+  tqGlow: new THREE.MeshPhysicalMaterial({ color: TQ, roughness: .2, metalness: .2, clearcoat: 1, emissive: TQ, emissiveIntensity: 0 }),
+  dark: new THREE.MeshPhysicalMaterial({ color: 0x222626, roughness: .35, metalness: .5 }),
+  floor: new THREE.MeshPhysicalMaterial({ color: 0x050606, roughness: .32, metalness: .1, clearcoat: .8, clearcoatRoughness: .2, envMapIntensity: .15 }),
+  wall: new THREE.MeshStandardMaterial({ color: 0x0d1111, roughness: .8 }),
+};
+const FACE_SIDE = [M.white, M.tq]; // face blanche, tranche turquoise
+
+// ---------- sol & mur ----------
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), M.floor);
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+// cercles lumineux au sol
+const floorRings = new THREE.Group(); scene.add(floorRings);
+for (let i = 0; i < 4; i++) {
+  const m = new THREE.Mesh(new THREE.RingGeometry(3 + i * 2.2, 3.04 + i * 2.2, 160), new THREE.MeshBasicMaterial({ color: TQ, transparent: true, opacity: .0, toneMapped: false }));
+  m.rotation.x = -Math.PI / 2; m.position.y = .005; floorRings.add(m);
+}
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), M.wall);
+wall.position.set(0, 0, -1.6); wall.receiveShadow = true; scene.add(wall);
+
+// ---------- lumières ----------
+scene.add(new THREE.HemisphereLight(0x9ff5ec, 0x000000, .12));
+const key = new THREE.SpotLight(0xffffff, 0, 0, .55, .7, 0);
+key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -.0004; key.shadow.normalBias = .02;
+key.shadow.camera.near = 2; key.shadow.camera.far = 60; key.shadow.radius = 6;
+scene.add(key, key.target);
+const rimL = new THREE.PointLight(TQ, 0, 0, 2), rimR = new THREE.PointLight(TQ, 0, 0, 2);
+scene.add(rimL, rimR);
+const burstLight = new THREE.PointLight(0x9ffff4, 0, 0, 2); scene.add(burstLight);
+const sweep = new THREE.SpotLight(0xffffff, 0, 0, .18, .5, 0); scene.add(sweep, sweep.target);
+
+// ---------- polices & texte 3D ----------
+const fonts = {};
+async function loadFont(k, url) { fonts[k] = new Font(await new TTFLoader().loadAsync(url)); }
+// mot découpé en lettres indépendantes, chaque lettre a son pivot au milieu de sa base
+function makeWord(text, font, size, depth, mats = FACE_SIDE, bevel = true) {
+  const group = new THREE.Group(), letters = [];
+  const sc = size / font.data.resolution;
+  let x = 0;
+  for (const ch of text) {
+    const gl = font.data.glyphs[ch] || font.data.glyphs['?'];
+    const adv = gl.ha * sc;
+    if (ch !== ' ') {
+      const geo = new TextGeometry(ch, {
+        font, size, depth, curveSegments: 10,
+        bevelEnabled: bevel, bevelThickness: size * .05, bevelSize: size * .03, bevelSegments: 4,
+      });
+      geo.computeBoundingBox();
+      const bb = geo.boundingBox, cx = (bb.min.x + bb.max.x) / 2;
+      geo.translate(-cx, 0, -depth / 2);
+      const mesh = new THREE.Mesh(geo, mats);
+      mesh.castShadow = mesh.receiveShadow = true;
+      const holder = new THREE.Group(); holder.add(mesh);
+      holder.userData.x = x + cx; holder.position.x = x + cx;
+      group.add(holder); letters.push(holder);
+    }
+    x += adv;
+  }
+  group.userData.width = x;
+  letters.forEach(l => { l.userData.x -= x / 2; l.position.x = l.userData.x; });
+  return { group, letters, width: x };
+}
+// ligne de texte d'un seul bloc, alignée à gauche, pivot sur la ligne de base
+function makeLine(text, font, size, depth, mats = FACE_SIDE) {
+  const geo = new TextGeometry(text, { font, size, depth, curveSegments: 5, bevelEnabled: true, bevelThickness: size * .04, bevelSize: size * .015, bevelSegments: 2 });
+  geo.translate(0, 0, -depth / 2);
+  const mesh = new THREE.Mesh(geo, mats); mesh.castShadow = mesh.receiveShadow = true;
+  const g = new THREE.Group(); g.add(mesh); return g;
+}
+
+// ---------- particules instanciées ----------
+const dummy = new THREE.Object3D();
+function instanced(geo, mat, n, shadow = true) {
+  const m = new THREE.InstancedMesh(geo, mat, n); m.castShadow = shadow; m.frustumCulled = false;
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m;
+}
+const hide = (m, i) => { dummy.position.set(0, -50, 0); dummy.scale.setScalar(0); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); };
+
+// explosion de billes turquoise/blanches qui rebondissent au sol
+const SHARDS = 420;
+const shards = instanced(new THREE.SphereGeometry(.11, 12, 8), new THREE.MeshPhysicalMaterial({ roughness: .2, clearcoat: 1, metalness: .2 }), SHARDS);
+const shardData = (() => { const r = rng(5), a = []; for (let i = 0; i < SHARDS; i++) {
+  const th = r() * Math.PI * 2, sp = 3 + r() * 11, up = 2 + r() * 14;
+  a.push({ vx: Math.cos(th) * sp, vz: Math.sin(th) * sp, vy: up, s: .5 + r() * 1.3 });
+  shards.setColorAt(i, new THREE.Color(r() < .65 ? TQ : 0xffffff));
+} return a; })();
+function updateShards(t, t0, y0) {
+  const d = t - t0;
+  for (let i = 0; i < SHARDS; i++) {
+    const p = shardData[i];
+    if (d < 0 || d > 6) { hide(shards, i); continue; }
+    const g = 22, tApex = p.vy / g, h = y0 + p.vy * p.vy / (2 * g);
+    const b = bounce(d - tApex, h, g, .35, 3);
+    const f = (1 - Math.exp(-1.1 * d)) / 1.1;
+    dummy.position.set(p.vx * f, Math.max(0, b.y) + .11 * p.s, p.vz * f);
+    dummy.scale.setScalar(p.s * (d > 5 ? 1 - (d - 5) : 1));
+    dummy.updateMatrix(); shards.setMatrixAt(i, dummy.matrix);
+  }
+  shards.instanceMatrix.needsUpdate = true;
+}
+
+// feux d'artifice (sphères lumineuses + bloom)
+const SPARKS = 900;
+const sparkMat = new THREE.MeshBasicMaterial({ toneMapped: false });
+const sparks = instanced(new THREE.SphereGeometry(.07, 6, 4), sparkMat, SPARKS, false);
+const FW = [];
+function addFirework(seed, t0, x, y, z, n, speed) {
+  const r = rng(seed), start = FW.reduce((s, f) => s + f.n, 0);
+  const ps = [];
+  for (let i = 0; i < n; i++) {
+    const u = r() * 2 - 1, th = r() * Math.PI * 2, s = Math.sqrt(1 - u * u), v = speed * (.75 + r() * .35);
+    ps.push({ d: V(s * Math.cos(th) * v, u * v, s * Math.sin(th) * v), life: 1.6 + r() * 1.2 });
+    sparks.setColorAt(start + i, new THREE.Color(r() < .6 ? TQ : 0xffffff).multiplyScalar(3.5));
+  }
+  FW.push({ t0, o: V(x, y, z), ps, n, start });
+}
+function updateFireworks(t) {
+  for (const f of FW) f.ps.forEach((p, i) => {
+    const d = t - f.t0, idx = f.start + i;
+    if (d < 0 || d > p.life) return hide(sparks, idx);
+    const k = (1 - Math.exp(-2.2 * d)) / 2.2;
+    dummy.position.set(f.o.x + p.d.x * k, f.o.y + p.d.y * k - 1.2 * d * d, f.o.z + p.d.z * k);
+    const life = 1 - d / p.life;
+    dummy.scale.setScalar(life * (Math.sin(d * 40 + i) > -.2 ? 1 : .3));
+    dummy.updateMatrix(); sparks.setMatrixAt(idx, dummy.matrix);
+  });
+  sparks.instanceMatrix.needsUpdate = true;
+}
+
+// confettis 3D qui tombent et se posent au sol
+const CONF = 700;
+const confetti = instanced(new THREE.PlaneGeometry(.22, .12), new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: .4, metalness: .3 }), CONF);
+const confData = (() => { const r = rng(9), a = []; for (let i = 0; i < CONF; i++) {
+  a.push({ x: (r() - .5) * 26, z: (r() - .5) * 14, y: 9 + r() * 10, vy: 1.6 + r() * 1.6, ph: r() * 7, f: 1 + r() * 2.5, sw: .3 + r() * .7, rx: r() * 7, rz: r() * 7, rv: 2 + r() * 6, dl: r() * 2.5, group: i % 2 });
+  confetti.setColorAt(i, new THREE.Color([TQ, 0xffffff, TQ, 0x9ff5ec][i % 4]));
+} return a; })();
+// confettis : deux pluies (scène BONNE ANNÉE et scène finale)
+function updateConfetti(t) {
+  const waves = [[19.4, 25.2], [40.2, 46]];
+  confData.forEach((c, i) => {
+    const [t0, t1] = waves[c.group];
+    const d = t - t0 - c.dl;
+    if (d < 0 || t > t1) return hide(confetti, i);
+    let y = c.y - c.vy * d;
+    if (y <= .01) { // posé au sol, à plat
+      const td = (c.y - .01) / c.vy;
+      dummy.position.set(c.x + Math.sin(td * c.f + c.ph) * c.sw, .012, c.z);
+      dummy.rotation.set(-Math.PI / 2, 0, c.rz + c.rv * td);
+    } else {
+      dummy.position.set(c.x + Math.sin(d * c.f + c.ph) * c.sw, y, c.z + Math.cos(d * c.f * .7 + c.ph) * c.sw * .5);
+      dummy.rotation.set(c.rx + d * c.rv, d * c.rv * .6, c.rz + d * c.rv * .3);
+    }
+    dummy.scale.setScalar(1); dummy.updateMatrix(); confetti.setMatrixAt(i, dummy.matrix);
+  });
+  confetti.instanceMatrix.needsUpdate = true;
+}
+
+// onde de poussière au sol lors des impacts (petits cubes)
+const DUST = 260;
+const dust = instanced(new THREE.BoxGeometry(.09, .09, .09), new THREE.MeshStandardMaterial({ color: 0xbff7ef, roughness: .6 }), DUST);
+const IMPACT_DUST = [];
+function addDust(t0, x, z, n, power) { IMPACT_DUST.push({ t0, x, z, n, power, start: IMPACT_DUST.reduce((s, d) => s + d.n, 0), r: rng(Math.floor(t0 * 100)) }); }
+function updateDust(t) {
+  for (const D of IMPACT_DUST) {
+    const r = rng(Math.floor(D.t0 * 100));
+    for (let i = 0; i < D.n; i++) {
+      const a = r() * Math.PI * 2, sp = D.power * (.5 + r()), up = r() * 3 * D.power / 5, idx = D.start + i, life = 1 + r();
+      const d = t - D.t0;
+      if (d < 0 || d > life) { hide(dust, idx); continue; }
+      const k = (1 - Math.exp(-3 * d)) / 3;
+      dummy.position.set(D.x + Math.cos(a) * (1.4 + sp * k), Math.max(.05, up * d - 6 * d * d + .05), D.z + Math.sin(a) * (.6 + sp * k * .6));
+      dummy.rotation.set(d * 9, d * 7, 0); dummy.scale.setScalar(1 - d / life);
+      dummy.updateMatrix(); dust.setMatrixAt(idx, dummy.matrix);
+    }
+  }
+  dust.instanceMatrix.needsUpdate = true;
+}
+
+// ---------- objets de chaque scène ----------
+const S = {};
+function build() {
+  // Scène 1 : la goutte
+  S.ball = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), M.tqGlow);
+  S.ball.castShadow = true; scene.add(S.ball);
+
+  // Scène 2 : 2026 → 2027
+  const DS = 3.2, DD = 1.3;
+  S.digits = ['2', '0', '2', '6', '7'].map(ch => makeWord(ch, fonts.bagel, DS, DD).letters[0]);
+  S.digitRow = new THREE.Group(); scene.add(S.digitRow);
+  const gap = 2.75;
+  S.digits.forEach((d, i) => { d.position.x = (Math.min(i, 3) - 1.5) * gap; S.digitRow.add(d); });
+  S.digits[4].children[0].material = [M.white, M.tqGlow];
+
+  // Scène 3 : BONNE ANNÉE
+  S.bonne = makeWord('BONNE', fonts.bagel, 2.3, 1.0);
+  S.annee = makeWord('ANNÉE', fonts.bagel, 2.3, 1.0, [M.tq, M.white]);
+  // BONNE se pose sur une marche noire brillante derrière ANNÉE
+  S.step = new THREE.Group();
+  const stepBox = new THREE.Mesh(new THREE.BoxGeometry(13, 2.6, 3), new THREE.MeshPhysicalMaterial({ color: 0x0a0c0c, roughness: .25, clearcoat: 1 }));
+  stepBox.position.y = 1.3; stepBox.castShadow = stepBox.receiveShadow = true;
+  const edge = new THREE.Mesh(new THREE.BoxGeometry(13.02, .06, .06), new THREE.MeshBasicMaterial({ color: new THREE.Color(TQ).multiplyScalar(2.5), toneMapped: false }));
+  edge.position.set(0, 2.6, 1.5);
+  S.step.add(stepBox, edge); S.step.position.z = -3; scene.add(S.step);
+  S.bonne.group.position.set(0, 2.6, -3); S.annee.group.position.set(0, 0, 1.4);
+  scene.add(S.bonne.group, S.annee.group);
+
+  // Scène 4 : le mot de Sébastien
+  S.msg = new THREE.Group(); scene.add(S.msg);
+  const L = [
+    { txt: 'LE MOT DU DIRECTEUR GÉNÉRAL', f: 'sans', s: .26, d: .06, y: 3.05, m: [M.tq, M.tq], t: 25.6 },
+    { txt: 'Chers clients, partenaires et collaborateurs,', f: 'sans', s: .36, d: .1, y: 2.25, m: [M.white, M.dark], t: 26.2 },
+    { txt: 'Que 2027 soit l’année', f: 'bagel', s: .95, d: .38, y: .9, m: FACE_SIDE, t: 27.4 },
+    { txt: 'de toutes les audaces !', f: 'bagel', s: .95, d: .38, y: -.35, m: [M.tq, M.white], t: 28.3 },
+    { txt: 'Merci pour votre confiance et votre énergie.', f: 'sans', s: .36, d: .1, y: -1.35, m: [M.white, M.dark], t: 30.0 },
+    { txt: 'Belle et heureuse année à toutes et à tous.', f: 'sans', s: .36, d: .1, y: -1.95, m: [M.white, M.dark], t: 30.7 },
+  ];
+  S.lines = L.map(l => { const g = makeLine(l.txt, fonts[l.f], l.s, l.d, l.m); g.position.set(-6.4, l.y, 0); g.userData = l; S.msg.add(g); return g; });
+  S.sig = makeLine('Sébastien', fonts.bagel, .8, .3, [M.white, M.tq]);
+  S.sig.position.set(-6.4, -3.35, 0); S.msg.add(S.sig);
+  S.sigTitle = makeLine('DIRECTEUR GÉNÉRAL — UPPO', fonts.sans, .24, .05, [M.tq, M.tq]);
+  const sigEnd = -6.4 + new THREE.Box3().setFromObject(S.sig).max.x - new THREE.Box3().setFromObject(S.sig).min.x;
+  S.sigTitle.position.set(sigEnd + .5, -3.25, 0); S.msg.add(S.sigTitle);
+  const u = x => -6.5 + (sigEnd + .3 + 6.5) * x;
+  const curve = new THREE.CatmullRomCurve3([V(u(0), -3.55, .2), V(u(.3), -3.72, .2), V(u(.62), -3.64, .2), V(u(.9), -3.5, .2), V(u(1), -3.4, .2)]);
+  S.underline = new THREE.Mesh(new THREE.TubeGeometry(curve, 120, .045, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color(TQ).multiplyScalar(2.2), toneMapped: false }));
+  S.msg.add(S.underline);
+
+  // Scène 5 : logo UPPO extrudé à partir du vecteur
+  S.logo = new THREE.Group(); scene.add(S.logo);
+  const LV = fonts.logo, sc = 12 / LV.w;
+  const toShape = sh => {
+    const pt = ([x, y]) => new THREE.Vector2((x - LV.w / 2) * sc, -(y - LV.h / 2) * sc);
+    const s = new THREE.Shape(sh.outer.map(pt));
+    sh.holes.forEach(h => s.holes.push(new THREE.Path(h.map(pt))));
+    return s;
+  };
+  const extrude = (sh, depth, mats, bevel) => {
+    const geo = new THREE.ExtrudeGeometry(toShape(sh), { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel * .6, bevelSegments: 4, curveSegments: 8 });
+    geo.computeBoundingBox(); const c = new THREE.Vector3(); geo.boundingBox.getCenter(c);
+    geo.translate(-c.x, -c.y, -depth / 2);
+    const m = new THREE.Mesh(geo, mats); m.castShadow = m.receiveShadow = true;
+    const g = new THREE.Group(); g.add(m); g.position.set(c.x, c.y, 0); g.userData.home = g.position.clone();
+    S.logo.add(g); return g;
+  };
+  // le symbole : le plus grand morceau = U, le plus petit = point
+  const sym = LV.symbol.slice().sort((a, b) => b.outer.length - a.outer.length);
+  S.logoU = extrude(sym[0], .7, [M.tq, M.tq], .08);
+  S.logoDot = extrude(sym[1], .7, [M.tq, M.tq], .08);
+  S.logoWord = LV.word.map(sh => extrude(sh, .5, [M.white, M.tq], .05)).sort((a, b) => a.position.x - b.position.x);
+  S.logoTag = [...LV.tagW.map(sh => extrude(sh, .12, [M.white, M.white], 0)), ...LV.tagT.map(sh => extrude(sh, .12, [M.tq, M.tq], 0))];
+  S.logo.position.set(0, 5.3, 0);
+  S.voeux = makeWord('MEILLEURS VŒUX 2027', fonts.bagel, .78, .32);
+  S.voeux.letters.forEach((l, i) => { if (i >= 14) l.children[0].material = [M.tq, M.white]; });
+  S.voeux.group.position.set(0, 2.2, .3); scene.add(S.voeux.group);
+  // logos partenaires : plans texturés
+  const tl = new THREE.TextureLoader();
+  const plane = (tex, h) => { tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(h * tex.image.width / tex.image.height, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false }));
+    scene.add(m); return m; };
+  S.pFormation = plane(fonts.texFormation, 1.05); S.pSelfie = plane(fonts.texSelfie, .82);
+  S.pFormation.position.set(-2.1, .95, .6); S.pSelfie.position.set(2.2, .95, .6);
+
+  // feux d'artifice de la scène 2027
+  addFirework(1, 14.2, -6, 8, -6, 150, 6);
+  addFirework(2, 14.6, 6, 9, -7, 150, 6);
+  addFirework(3, 15.1, 0, 10.5, -9, 180, 7);
+  addFirework(4, 15.6, -3, 7, -5, 120, 5);
+  addFirework(5, 16.0, 4, 7.5, -4, 120, 5);
+  addFirework(6, 41.0, -7, 9, -8, 90, 6);
+  addFirework(7, 41.4, 7, 9, -8, 90, 6);
+  // impacts au sol
+  [0, 1, 2, 3].forEach(i => addDust(8.05 + i * .45 + .45, (i - 1.5) * 2.75, 0, 18, 4));
+  addDust(13.55, 1.5 * 2.75, 0, 60, 7);
+}
+
+// ---------- caméra ----------
+function shake(t) {
+  let x = 0, y = 0;
+  for (const [t0, a] of [[6.9, .5], [13.55, .45], [8.5, .08], [8.95, .08], [9.4, .08], [9.85, .08], [39.0, .12]]) {
+    const d = t - t0; if (d < 0 || d > .8) continue;
+    const k = a * Math.exp(-d * 7); x += Math.sin(d * 63 + t0) * k; y += Math.cos(d * 71 + t0) * k;
+  }
+  return [x, y];
+}
+function setCam(p, look) { camera.position.copy(p); camera.lookAt(look); }
+
+// ---------- exposition (fondus au noir, flashs) ----------
+function exposure(t) {
+  let e = 1;
+  e *= eInOutSine(prog(t, 0, 1.2));
+  for (const [a, b] of [[16.6, 17.4], [24.5, 25.3], [36.6, 37.4]]) { const m = (a + b) / 2; e *= t < m ? 1 - eInOutSine(prog(t, a, m)) : eInOutSine(prog(t, m, b)); }
+  for (const [t0, f] of [[6.9, 5], [13.55, 2.2], [38.95, 1.2]]) { const d = t - t0; if (d >= 0 && d < 1) e += f * Math.exp(-d * 6); }
+  return e;
+}
+
+// ---------- rendu d'une image ----------
+const all = () => [S.ball, S.digitRow, S.bonne.group, S.annee.group, S.step, S.msg, S.logo, S.voeux.group, S.pFormation, S.pSelfie, wall];
+function render(t) {
+  all().forEach(o => o.visible = false);
+  floor.visible = true; floorRings.visible = true;
+  floorRings.children.forEach(r => r.material.opacity = 0);
+  rimL.intensity = rimR.intensity = burstLight.intensity = sweep.intensity = 0;
+  M.tqGlow.emissiveIntensity = 0;
+  bloom.strength = .45;
+  const [sx, sy] = shake(t);
+
+  if (t < 7) sceneDrop(t);
+  else if (t < 17) sceneYear(t);
+  else if (t < 25) sceneBonne(t);
+  else if (t < 37) sceneMessage(t);
+  else sceneLogo(t);
+
+  // les intensités des scènes sont exprimées sur une échelle « artistique », ramenée ici en unités physiques
+  for (const l of [key, sweep]) l.intensity *= .2;
+  for (const l of [rimL, rimR, burstLight]) l.intensity *= 1.6; // lumières ponctuelles atténuées en 1/d²
+  camera.position.x += sx; camera.position.y += sy;
+  updateShards(t, 6.9, 1.6);
+  updateFireworks(t);
+  updateConfetti(t);
+  updateDust(t);
+  renderer.toneMappingExposure = exposure(t) * 1.05;
+  composer.render();
+}
+
+// SCÈNE 1 (0 → 7 s) : une goutte turquoise tombe, rebondit, lévite et explose
+function sceneDrop(t) {
+  key.position.set(-5, 13, 7); key.target.position.set(0, 0, 0);
+  key.intensity = lerp(0, 9, eOutCubic(prog(t, .4, 1.6))); key.angle = .42;
+  rimL.position.set(-5, 2, -4); rimR.position.set(5, 2, -4);
+  rimL.intensity = rimR.intensity = 6 * prog(t, 1, 3);
+  const ring = prog(t, 2, 5.5);
+  floorRings.children.forEach((r, i) => r.material.opacity = ring * .25 * (1 - i * .2) * (.6 + .4 * Math.sin(t * 3 - i)));
+  const b = S.ball; b.visible = t < 6.9;
+  let y, sq = 0;
+  if (t < 5.2) { const bb = bounce(t - 1.4, 9, 26, .48, 4); y = t < 1.4 ? 30 : bb.y + 1; sq = squash(bb.since); }
+  else { const k = eInOutCubic(prog(t, 5.2, 6.4)); y = 1 + k * .6 + Math.sin(prog(t, 6.4, 6.9) * 40) * .03 * prog(t, 6.4, 6.9); }
+  b.position.set(0, y, 0);
+  const swell = eInCubic(prog(t, 6.2, 6.9));
+  b.scale.set((1 + sq * .35) * (1 + swell * .5), (1 - sq * .35) * (1 + swell * .5), (1 + sq * .35) * (1 + swell * .5));
+  b.rotation.y = t * 2;
+  M.tqGlow.emissiveIntensity = prog(t, 5.2, 6.9) * 2.5;
+  burstLight.position.set(0, 1.6, 0);
+  burstLight.intensity = prog(t, 5.6, 6.9) * 30;
+  const k = eInOutSine(prog(t, 0, 7));
+  setCam(V(lerp(-2, 3.2, k), lerp(1.4, 2.6, k), lerp(14, 9, k)), V(0, lerp(2.2, 1.4, k), 0));
+}
+
+// SCÈNE 2 (7 → 17 s) : 2026 tombe du ciel, le 6 bascule, le 7 s'écrase
+function sceneYear(t) {
+  S.digitRow.visible = true;
+  key.position.set(-7, 12, 9); key.target.position.set(0, 1, 0); key.intensity = 8.5; key.angle = .55;
+  rimL.position.set(-6, 3, -3); rimR.position.set(6, 3, -3); rimL.intensity = rimR.intensity = 8;
+  floorRings.children.forEach((r, i) => r.material.opacity = .18 * (.6 + .4 * Math.sin(t * 2.5 - i)));
+  const gap = 2.75;
+  S.digits.forEach((d, i) => {
+    if (i < 3) { // 2, 0, 2
+      const t0 = 7.6 + i * .45, bb = bounce(t - t0, 14, 34, .35, 3);
+      d.position.y = t < t0 ? 40 : bb.y; const sq = squash(bb.since);
+      d.scale.set(1 + sq * .18, 1 - sq * .18, 1 + sq * .18);
+      d.rotation.set(0, (1 - eOutCubic(prog(t, t0, t0 + 1.2))) * 1.4 * (i % 2 ? 1 : -1), 0);
+      // vague à 15.2 s
+      const w = prog(t, 15.0 + i * .14, 15.6 + i * .14); d.position.y += Math.sin(w * Math.PI) * 1.2;
+      d.rotation.y += w * Math.PI * 2;
+    }
+  });
+  // le 6
+  const six = S.digits[3], t6 = 7.6 + 3 * .45;
+  const bb6 = bounce(t - t6, 14, 34, .35, 3);
+  six.visible = t < 14.5;
+  six.position.set(1.5 * gap, t < t6 ? 40 : bb6.y, 0);
+  six.rotation.set(0, (1 - eOutCubic(prog(t, t6, t6 + 1.2))) * 1.4, 0);
+  if (t > 11.2) { // tremble puis bascule en arrière, glisse et sort
+    const tr = prog(t, 11.2, 12.2) * (1 - prog(t, 12.2, 12.3));
+    six.rotation.z = Math.sin(t * 45) * .05 * tr;
+    const fall = eInCubic(prog(t, 12.3, 13.0));
+    six.rotation.x = -fall * Math.PI / 2;
+    six.position.z = -fall * .65 - eOutCubic(prog(t, 13.55, 14.5)) * 6;
+    six.position.y = fall * .65;
+  }
+  // le 7 tombe de très haut, s'écrase et s'illumine
+  const seven = S.digits[4];
+  seven.visible = t > 12.6;
+  const f7 = prog(t, 12.75, 13.55);
+  seven.position.set(1.5 * gap, lerp(26, 0, eInCubic(f7)), 0);
+  const s7 = t > 13.55 ? squash(t - 13.55) : 0;
+  seven.scale.set(1 + s7 * .3, 1 - s7 * .3, 1 + s7 * .3);
+  seven.rotation.y = (1 - f7) * 6;
+  const w7 = prog(t, 15.42, 16.02); seven.position.y += Math.sin(w7 * Math.PI) * 1.2; seven.rotation.y += w7 * Math.PI * 2;
+  M.tqGlow.emissiveIntensity = t > 13.55 ? .25 + Math.exp(-(t - 13.55) * 3) * 2 : 0;
+  burstLight.position.set(1.5 * gap, 2, 2); burstLight.intensity = t > 13.55 ? Math.exp(-(t - 13.55) * 2.5) * 40 : 0;
+  // caméra : orbite lente puis poussée
+  const k = eInOutSine(prog(t, 7, 13.5)), k2 = eInOutSine(prog(t, 13.5, 17));
+  const ang = lerp(-.55, .22, k) + k2 * .12, rad = lerp(19, 15.5, k) - k2 * 2.5, hgt = lerp(2.2, 4.2, k) + k2 * .8;
+  setCam(V(Math.sin(ang) * rad, hgt, Math.cos(ang) * rad), V(0, 1.7, 0));
+}
+
+// SCÈNE 3 (17 → 25 s) : BONNE ANNÉE en lettres géantes qui tombent
+function sceneBonne(t) {
+  S.bonne.group.visible = S.annee.group.visible = S.step.visible = true;
+  key.position.set(-8, 14, 10); key.target.position.set(0, 0, 0); key.intensity = 8.5; key.angle = .6;
+  rimL.position.set(-8, 3, -6); rimR.position.set(8, 3, -6); rimL.intensity = rimR.intensity = 9;
+  floorRings.children.forEach((r, i) => r.material.opacity = .2 * (.6 + .4 * Math.sin(t * 3 - i)));
+  const drop = (letters, t0, dt, flip) => letters.forEach((l, i) => {
+    const s = t0 + i * dt, bb = bounce(t - s, 14, 34, .38, 3);
+    l.position.y = t < s ? 40 : bb.y;
+    const sq = squash(bb.since); l.scale.set(1 + sq * .2, 1 - sq * .2, 1 + sq * .2);
+    const r = 1 - eOutCubic(prog(t, s, s + 1.1));
+    l.rotation.set(r * flip, r * 2.5 * (i % 2 ? 1 : -1), r * .6);
+    // petit saut de joie en rythme
+    const j = prog(t, 22.0 + i * .1 + (flip > 0 ? 0 : .5), 22.5 + i * .1 + (flip > 0 ? 0 : .5));
+    l.position.y += Math.sin(j * Math.PI) * .7;
+  });
+  drop(S.bonne.letters, 17.5, .22, 1.2);
+  drop(S.annee.letters, 18.8, .22, -1.2);
+  const k = eInOutSine(prog(t, 17, 25));
+  setCam(V(lerp(-7, 6, k), lerp(9.5, 6.2, k), lerp(19, 16, k)), V(0, 1.9, -.5));
+}
+
+// SCÈNE 4 (25 → 37 s) : le mot de Sébastien, lignes qui basculent et projettent leur ombre au mur
+function sceneMessage(t) {
+  S.msg.visible = true; wall.visible = true; floor.visible = false; floorRings.visible = false;
+  key.position.set(-9, 9, 13); key.target.position.set(0, 0, 0); key.intensity = 7; key.angle = .5;
+  rimL.position.set(8, -2, 4); rimL.intensity = 3;
+  bloom.strength = .2;
+  S.lines.forEach(g => {
+    const k = prog(t, g.userData.t, g.userData.t + .9), out = prog(t, 36.0 + g.userData.y * -.05, 36.6);
+    g.rotation.x = -(1 - eOutBack(k, 1.4)) * Math.PI / 2 + eInCubic(out) * Math.PI / 2;
+    g.position.z = (1 - eOutCubic(k)) * 2;
+    g.visible = k > 0;
+  });
+  const sk = prog(t, 32.2, 33.1);
+  S.sig.visible = sk > 0; S.sig.rotation.y = (1 - eOutBack(sk)) * -Math.PI / 2; S.sig.position.z = (1 - eOutCubic(sk)) * 1.5;
+  const tk = prog(t, 33.0, 33.6); S.sigTitle.visible = tk > 0; S.sigTitle.position.y = -3.25 - (1 - eOutCubic(tk)) * .5; S.sigTitle.rotation.x = -(1 - tk) * 1.2;
+  const uk = eInOutCubic(prog(t, 32.7, 33.7));
+  S.underline.geometry.setDrawRange(0, Math.floor(S.underline.geometry.index.count * uk / 6) * 6);
+  S.underline.visible = uk > 0;
+  const k = eInOutSine(prog(t, 25, 37));
+  setCam(V(lerp(2.6, -1.4, k), lerp(-.6, .5, k), lerp(16.5, 14.2, k)), V(lerp(.4, -.3, k), -.1, 0));
+}
+
+// SCÈNE 5 (37 → 45 s) : le logo UPPO se construit en 3D
+function sceneLogo(t) {
+  S.logo.visible = S.voeux.group.visible = S.pFormation.visible = S.pSelfie.visible = true;
+  key.position.set(-6, 14, 12); key.target.position.set(0, 3, 0); key.intensity = 8; key.angle = .55;
+  rimL.position.set(-7, 6, -3); rimR.position.set(7, 6, -3); rimL.intensity = rimR.intensity = 9;
+  floorRings.children.forEach((r, i) => r.material.opacity = .22 * prog(t, 39, 40) * (.6 + .4 * Math.sin(t * 3 - i)));
+  // U qui monte en tournant
+  const uk = prog(t, 37.4, 38.9);
+  S.logoU.position.y = S.logoU.userData.home.y - (1 - eOutBack(uk, 1.3)) * 6;
+  S.logoU.rotation.y = (1 - eOutCubic(uk)) * Math.PI * 2;
+  // le point tombe du ciel et rebondit à sa place (rappel de l'intro)
+  const bb = bounce(t - 38.3, 9, 30, .4, 3);
+  S.logoDot.position.y = S.logoDot.userData.home.y + (t < 38.3 ? 30 : bb.y);
+  const sq = squash(bb.since); S.logoDot.scale.set(1 + sq * .3, 1 - sq * .3, 1);
+  // lettres UPPO qui glissent depuis la droite en pivotant
+  S.logoWord.forEach((g, i) => {
+    const k = prog(t, 39.2 + i * .12, 40.1 + i * .12);
+    g.position.x = g.userData.home.x + (1 - eOutExpo(k)) * 14;
+    g.rotation.y = (1 - eOutBack(k, 1.6)) * -Math.PI * .9;
+    g.visible = k > 0;
+  });
+  S.logoTag.forEach((g, i) => {
+    const k = prog(t, 40.1 + (g.userData.home.x + 6) * .05, 40.7 + (g.userData.home.x + 6) * .05);
+    g.scale.setScalar(eOutBack(k, 2)); g.visible = k > 0;
+  });
+  S.voeux.letters.forEach((l, i) => {
+    const k = prog(t, 40.6 + i * .045, 41.3 + i * .045);
+    l.rotation.x = -(1 - eOutBack(k, 1.5)) * Math.PI / 2; l.visible = k > 0;
+  });
+  const pk = eOutCubic(prog(t, 41.6, 42.4));
+  [S.pFormation, S.pSelfie].forEach(p => { p.material.opacity = pk; p.position.y = .95 - (1 - pk) * .4; });
+  // reflet : un projecteur balaie le logo
+  const sw = prog(t, 42.8, 44.2);
+  sweep.position.set(lerp(-10, 10, eInOutSine(sw)), 9, 9); sweep.target.position.set(lerp(-6, 6, eInOutSine(sw)), 5, 0);
+  sweep.intensity = Math.sin(sw * Math.PI) * 25;
+  const k = eInOutSine(prog(t, 37, 45));
+  setCam(V(lerp(-3.5, 0, k), lerp(1.8, 3.6, k), lerp(25, 18.2, k)), V(0, lerp(3.8, 3.4, k), 0));
+}
+
+window.ready = (async () => {
+  const [ , , logo, texF, texS] = await Promise.all([
+    loadFont('bagel', 'assets/fonts/BagelFatOne.ttf'),
+    loadFont('sans', 'assets/fonts/Montserrat-Bold.ttf'),
+    fetch('assets/uppo-logo-vector.json').then(r => r.json()),
+    new THREE.TextureLoader().loadAsync('assets/uppo-formation-white.png'),
+    new THREE.TextureLoader().loadAsync('assets/maselfiebox.png'),
+  ]);
+  fonts.logo = logo; fonts.texFormation = texF; fonts.texSelfie = texS;
+  build();
+  window.render = render;
+  window.DUR = DUR;
+  if (!location.search.includes('static')) {
+    const start = performance.now();
+    const loop = () => { render(((performance.now() - start) / 1000) % DUR); requestAnimationFrame(loop); };
+    loop();
+  }
+})();
+</script>
+</body>
+</html>

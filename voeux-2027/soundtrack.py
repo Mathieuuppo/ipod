@@ -1,11 +1,11 @@
-"""Bande-son synthétisée (15 s, 120 BPM) calée sur les impacts de voeux.html.
+"""Bande-son synthétisée (45 s) calée sur les impacts de voeux3d.html.
 Usage : python3 soundtrack.py  -> soundtrack.wav
 """
 import wave
 import numpy as np
 
 SR = 48000
-DUR = 15.0
+DUR = 45.0
 N = int(SR * DUR)
 L = np.zeros(N)
 R = np.zeros(N)
@@ -128,74 +128,103 @@ def crackle(d=0.8, gain=0.25):
     return s * np.exp(-tt(d) * 3) * gain
 
 
-# --- 0 → 1 s : la goutte tombe ---
-t = tt(0.7)
-f = 1800 * (250 / 1800) ** (t / 0.7)
-add(np.sin(2 * np.pi * np.cumsum(f) / SR) * 0.18 * np.minimum(1, t / 0.05), 0.03)
-add(kick(0.6), 0.72)
-add(riser(0.28, 300, 3000), 0.72, 0.6)
-add(boom(), 1.0, 1.0)
+CH = {'Am': ['A3', 'C4', 'E4'], 'F': ['F3', 'A3', 'C4'], 'C': ['C4', 'E4', 'G4'], 'G': ['G3', 'B3', 'D4']}
+ROOT = {'Am': 'A1', 'F': 'F1', 'C': 'C2', 'G': 'G1'}
+PROG = ['Am', 'F', 'C', 'G']
 
-# --- 1 → 4.6 s : beat énergique ---
-prog_bass = ['A1', 'A1', 'F1', 'F1', 'C2', 'C2', 'G1', 'G1']
-for i in range(8):
-    b = 1.0 + i * 0.5
-    if b != 1.0:
-        add(kick(), b)
-    if i % 2:
-        add(snare(), b, 0.35)
-    add(hat(), b + 0.25, 0.25, 0.3)
-    for j in range(2):
-        add(bass(note(prog_bass[i])), b + j * 0.25)
-add(riser(0.5, 400, 4000), 2.4, 0.5)
-add(boom(2.0), 2.9, 0.9)
-add(stab(['A3', 'C4', 'E4', 'A4']), 2.9)
-for i, ft in enumerate([3.10, 3.30, 3.55, 3.75, 3.95]):
-    add(kick(0.25), ft, 0.5, (-0.6, 0.6, 0.3, -0.3, 0)[i])
-    add(crackle(), ft + 0.08, 1, (-0.6, 0.6, 0.3, -0.3, 0)[i])
-for k in range(16):  # roulement de caisse claire accéléré
-    add(snare(0.08), 4.0 + 0.6 * (1 - (1 - k / 16) ** 1.6), 0.15 + k * 0.02)
-add(riser(0.6, 300, 5000), 4.0, 0.55)
-add(whoosh(0.45), 4.25, 0.6)
-add(boom(1.6), 4.62, 0.8)
+# --- 0 → 7 s : la goutte ---
+add(pad(['A2', 'E3', 'A3'], 5.4, 0.08), 0.0)
+t = tt(0.83)
+f = 2000 * (300 / 2000) ** (t / 0.83)
+add(np.sin(2 * np.pi * np.cumsum(f) / SR) * 0.12 * np.minimum(1, t / 0.05), 1.4)
+for ti, g in [(2.232, 1.0), (3.031, .6), (3.414, .35), (3.598, .2)]:
+    add(kick(g), ti)
+    add(bell(note('A5'), .8, .08 * g), ti)
+add(riser(1.7, 150, 3500), 5.2, 0.7)
+add(boom(3.0), 6.9, 1.2)
 
-# --- 4.6 → 6.85 s : BONNE ANNÉE ---
-chords = [['A3', 'C4', 'E4'], ['F3', 'A3', 'C4'], ['C4', 'E4', 'G4'], ['G3', 'B3', 'D4']]
-for i in range(5):
-    b = 4.62 + i * 0.45
+# --- 7 → 17 s : 2026 → 2027 (tempo calé sur la chute des chiffres, 0,45 s) ---
+P = 0.45
+for i in range(18):
+    b = 8.507 + i * P
+    if b > 16.6:
+        break
+    if 11.2 <= b < 13.55:  # tension : la musique se suspend
+        add(hat(), b, 0.15)
+        continue
     add(kick(), b)
-    add(hat(), b + 0.225, 0.3, -0.3)
+    add(hat(), b + P / 2, 0.22, 0.3)
     if i % 2:
-        add(snare(), b, 0.35)
-    add(stab(chords[i % 4], 0.3), b, 1.0)
-    add(bass(note(prog_bass[(i * 2) % 8])), b)
-for i in range(5):  # chaque lettre qui tombe
-    add(hat(0.03), 4.98 + i * 0.06, 0.3, -0.5 + i * 0.25)
-add(whoosh(0.55), 6.4, 0.9)
+        add(snare(), b, 0.3)
+    add(bass(note(ROOT[PROG[(i // 2) % 4]])), b)
+for ti in [8.507, 8.957, 9.407, 9.857]:
+    add(boom(0.6), ti, 0.35)
+t = tt(1.0)
+add(np.sin(2 * np.pi * 70 * t + 8 * np.sin(2 * np.pi * 9 * t)) * np.exp(-t * 1) * .08, 11.2)  # le 6 tremble
+add(kick(0.7), 13.0)
+add(riser(0.8, 300, 5000), 12.75, 0.6)
+add(boom(2.6), 13.55, 1.1)
+add(stab(['A3', 'C4', 'E4', 'A4'], 0.6, 0.2), 13.55)
+for i, ft in enumerate([14.2, 14.6, 15.1, 15.6, 16.0]):
+    pan = (-0.6, 0.6, 0, -0.3, 0.3)[i]
+    add(kick(0.3), ft, 0.5, pan)
+    add(crackle(1.0), ft + 0.08, 1, pan)
+for i, n in enumerate(['A4', 'C5', 'E5', 'A5']):
+    add(bell(note(n), .6, .1), 15.0 + i * .14)
+add(whoosh(0.8), 16.4, 0.8)
 
-# --- 6.85 → 11.4 s : le mot de Sébastien, plus posé ---
+# --- 17 → 25 s : BONNE ANNÉE ---
+for i in range(16):
+    b = 17.4 + i * P
+    if b > 24.4:
+        break
+    add(kick(), b)
+    add(hat(), b + P / 2, 0.25, -0.3)
+    if i % 2:
+        add(snare(), b, 0.32)
+    c = PROG[(i // 2) % 4]
+    add(bass(note(ROOT[c])), b)
+    if i % 2 == 0:
+        add(stab(CH[c], 0.35, 0.12), b)
+for i in range(5):
+    add(boom(0.5), 18.407 + i * .22, 0.3, -0.5 + i * .25)
+    add(boom(0.5), 19.707 + i * .22, 0.3, -0.5 + i * .25)
+for i in range(10):
+    add(bell(note(['C5', 'E5', 'G5', 'C6', 'E6'][i % 5]), .5, .07), 22.0 + i * .1)
+add(whoosh(0.9), 24.2, 0.8)
+
+# --- 25 → 37 s : le mot de Sébastien, plus posé ---
 pad_chords = [['A3', 'C4', 'E4', 'A4'], ['F3', 'A3', 'C4', 'F4'], ['C4', 'E4', 'G4', 'C5'], ['G3', 'B3', 'D4', 'G4']]
-for i, ch in enumerate(pad_chords):
-    add(pad(ch, 1.25), 6.85 + i * 1.15)
-    add(bass(note(['A1', 'F1', 'C2', 'G1'][i]), 1.0, 0.25), 6.85 + i * 1.15)
-for i in range(9):
-    add(kick(0.5), 6.85 + i * 0.5)
-    add(hat(), 7.1 + i * 0.5, 0.15, 0.4)
-arp = ['A5', 'E5', 'C5', 'E5', 'F5', 'C5', 'A4', 'C5', 'G5', 'E5', 'C5', 'E5', 'G5', 'D5', 'B4', 'D5', 'A5', 'E5']
-for i, n in enumerate(arp):
-    add(bell(note(n)), 6.85 + i * 0.25, 0.8, (-0.4, 0.4)[i % 2])
-add(bell(note('E6'), 1.4, 0.15), 10.25)  # signature
+for i in range(5):
+    add(pad(pad_chords[i % 4], 2.6, 0.09), 25.0 + i * 2.4)
+    add(bass(note(['A1', 'F1', 'C2', 'G1'][i % 4]), 2.2, 0.2), 25.0 + i * 2.4)
+for i in range(22):
+    add(kick(0.35), 25.6 + i * 0.5)
+    add(hat(), 25.85 + i * 0.5, 0.1, 0.4)
+arp = ['A5', 'E5', 'C5', 'E5', 'F5', 'C5', 'A4', 'C5', 'G5', 'E5', 'C5', 'E5', 'G5', 'D5', 'B4', 'D5']
+for i in range(44):
+    add(bell(note(arp[i % 16]), .7, .05), 25.3 + i * 0.25, 1, (-0.4, 0.4)[i % 2])
+for ti in [25.6, 26.2, 27.4, 28.3, 30.0, 30.7]:
+    add(whoosh(0.3), ti, 0.35)
+add(bell(note('E6'), 1.6, 0.14), 32.2)
+add(bell(note('A6'), 1.6, 0.1), 32.7)
+add(riser(1.2, 200, 4000), 36.2, 0.5)
 
-# --- 11.4 → 15 s : révélation du logo ---
-for k in range(14):
-    add(snare(0.08), 11.45 + 0.58 * (1 - (1 - k / 14) ** 1.6), 0.12 + k * 0.02)
-add(riser(0.65, 300, 5000), 11.4, 0.6)
-add(boom(2.8), 12.05, 1.1)
-add(stab(['A3', 'C4', 'E4', 'A4'], 0.6, 0.2), 12.05)
-add(pad(['F3', 'A3', 'C4', 'E4', 'A4'], 2.95, 0.12), 12.05)
+# --- 37 → 45 s : le logo UPPO ---
+add(whoosh(1.4), 37.4, 0.9)
+for ti, g in [(39.075, 1.0), (39.695, .5), (39.94, .25)]:
+    add(kick(g), ti)
+add(boom(3.0), 39.075, 1.0)
+add(stab(['A3', 'C4', 'E4', 'A4'], 0.8, 0.18), 39.075)
+add(pad(['F3', 'A3', 'C4', 'E4', 'A4'], 5.9, 0.11), 39.1)
+for i in range(6):
+    add(whoosh(0.25), 39.2 + i * .12, 0.35, -0.5 + i * .2)
 for i, n in enumerate(['C6', 'E6', 'G6', 'C7', 'G6', 'E6', 'A6', 'C7']):
-    add(bell(note(n), 1.2, 0.07), 12.3 + i * 0.18, 1, (-0.5, 0.5)[i % 2])
-add(bell(note('A5'), 1.5, 0.12), 13.5)  # reflet sur le logo
+    add(bell(note(n), 1.2, 0.06), 40.6 + i * 0.18, 1, (-0.5, 0.5)[i % 2])
+for i, ft in enumerate([41.0, 41.4]):
+    add(crackle(1.0, .2), ft + .08, 1, (-0.6, 0.6)[i])
+add(bell(note('A5'), 2.0, 0.12), 42.8)
+add(bell(note('E6'), 2.0, 0.08), 43.3)
 
 # --- réverbération légère + mastering ---
 def reverb(x):

@@ -3,3 +3,4 @@ out/*-raw.mp4
 out/stills
 .DS_Store
 out/*.log
+out/*-raw.mp4

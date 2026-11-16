@@ -1,5 +1,5 @@
 import React from 'react';
-import {AbsoluteFill, Audio, Sequence, staticFile} from 'remotion';
+import {AbsoluteFill, Sequence} from 'remotion';
 import {C, FONT, T} from './theme';
 import {Grain} from './components/Fx';
 import {StudioBg} from './components/Ui';
@@ -42,7 +42,7 @@ export const MaSelfieBoxReel: React.FC = () => (
       </Sequence>
     ))}
     <Grain opacity={0.035} />
-    <Audio src={staticFile('audio/music-maselfiebox-reel-120bpm.wav')} volume={0.95} />
+    {/* Pas de musique (demande du client) : uniquement les bruitages. */}
     <SfxTrack />
   </AbsoluteFill>
 );

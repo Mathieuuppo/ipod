@@ -241,6 +241,29 @@ def crash(dur=2.4):
 
 
 # ----------------------------------------------------------------- MUSIQUE
+
+def lead_note(freq, dur):
+    """Voix lead : dent de scie douce, léger vibrato, filtrée."""
+    t = t_arr(dur)
+    vib = 1 + 0.0045 * np.sin(2 * np.pi * 5.5 * t) * np.clip((t - 0.12) / 0.1, 0, 1)
+    ph = 2 * np.pi * np.cumsum(freq * vib) / SR
+    y = np.zeros_like(t)
+    for k in range(1, 13):
+        if freq * k > SR / 2.4:
+            break
+        y += np.sin(k * ph) / k
+    y = y * 0.5 + np.sin(ph) * 0.5
+    y = lp(y, 2600)
+    return y * env_adsr(len(t), 0.012, 0.12, 0.72, 0.09)
+
+
+# mélodie (accroche de 4 mesures, en temps : début, note MIDI, durée)
+HOOK = [
+    (0.0, 69, 0.5), (0.5, 72, 0.5), (1.0, 69, 0.5), (1.5, 67, 0.5), (2.0, 65, 1.0), (3.0, 67, 0.5), (3.5, 69, 0.5),
+    (4.0, 67, 1.0), (5.0, 64, 1.0), (6.0, 72, 1.0), (7.0, 67, 1.0),
+    (8.0, 71, 0.5), (8.5, 74, 0.5), (9.0, 71, 0.5), (9.5, 69, 0.5), (10.0, 67, 1.0), (11.0, 69, 0.5), (11.5, 71, 0.5),
+    (12.0, 72, 1.0), (13.0, 69, 1.0), (14.0, 76, 1.0), (15.0, 74, 0.5), (15.5, 72, 0.5),
+]
 CHORDS = [  # F, C, G, Am  (IV - I - V - vi) : lumineux, positif
     [53, 57, 60, 65],
     [52, 55, 60, 64],
@@ -281,10 +304,10 @@ def build_music():
         if e >= 2 and pos in (1, 3):
             place(drums, stereo(Cl, 0.0), t, 0.5 if e < 4 else 0.6)
         if e >= 2:
-            place(drums, stereo(hat(open_=True), 0.15), t + BEAT / 2, 0.26)
+            place(drums, stereo(hat(open_=True), 0.15), t + BEAT / 2, 0.16)
         if e >= 3:
             for s_ in (1, 3):
-                place(drums, stereo(hat(), -0.25), t + s_ * BEAT / 4, 0.2)
+                place(drums, stereo(hat(), -0.25), t + s_ * BEAT / 4, 0.12)
         if e == 4 and pos == 3:
             place(drums, stereo(Cl, 0.3), t + BEAT * 0.75, 0.25)  # contretemps festif
         if 3.0 <= t < 5.0:
@@ -346,15 +369,30 @@ def build_music():
     # notification de la galerie : cloches douces 56-61
     for t, m in ((57.0, 84), (57.25, 88), (59.0, 84), (59.25, 91)):
         place(keys, stereo(keys_note(midi(m), 1.2), 0.2), t, 0.25)
+    # MÉLODIE : accroche de 4 mesures répétée sur les sections chantantes
+    lead = np.zeros((2, N))
+    for a_, b_, g_ in ((5.0, 13.0, 0.42), (13.0, 19.0, 0.36), (19.0, 33.0, 0.3), (33.0, 50.0, 0.44), (56.0, 61.0, 0.36)):
+        t0 = 8.0 * np.floor(a_ / 8.0)  # calé sur la grille d'accords (4 mesures)
+        while t0 < b_:
+            for off, m, d in HOOK:
+                tt = t0 + off * BEAT
+                if a_ <= tt < b_:
+                    place(lead, stereo(lead_note(midi(m), d * BEAT * 0.95), 0.0), tt, g_)
+            t0 += 4 * BAR
+    dl = int(SR * BEAT * 0.75)
+    echo_l = np.zeros_like(lead)
+    echo_l[0, dl:] = lead[1, :-dl] * 0.3
+    echo_l[1, dl:] = lead[0, :-dl] * 0.3
+    lead = lead + echo_l
     # FX musicaux
     place(fx, stereo(sub_boom(1.4, 100, 34)), 0.25, 0.45)
-    place(fx, stereo(noise_riser(1.0, 400, 9000, 2.2)), 4.0, 0.25)
+    place(fx, stereo(noise_riser(1.0, 400, 9000, 2.2)), 4.0, 0.12)
     for t, g in ((5.0, 0.55), (13.0, 0.45), (40.5, 0.65), (61.0, 0.4)):
         place(fx, stereo(sub_boom(1.4, 95, 30)), t, g)
-        place(fx, stereo(crash(2.0), 0.1), t, 0.4)
-    place(fx, stereo(noise_riser(2.0, 300, 9000, 2.5)), 38.5, 0.28)
+        place(fx, stereo(crash(2.0), 0.1), t, 0.15)
+    place(fx, stereo(noise_riser(2.0, 300, 9000, 2.5)), 38.5, 0.12)
     place(fx, stereo(sub_boom(2.0, 110, 28)), 62.0, 0.8)
-    place(fx, stereo(crash(2.4), 0.0), 62.0, 0.5)
+    place(fx, stereo(crash(2.4), 0.0), 62.0, 0.2)
     duck = np.ones(N)
     for bi in range(n_beats):
         t = bi * BEAT
@@ -363,7 +401,7 @@ def build_music():
             curve = 1 - 0.6 * np.exp(-np.arange(L) / SR * 12)
             duck[i0:i0 + L] = np.minimum(duck[i0:i0 + L], curve[:len(duck[i0:i0 + L])])
     bass *= duck; pads *= (0.4 + 0.6 * duck); arps *= (0.55 + 0.45 * duck)
-    mix = (drums * 0.9 + bass + reverb(pads, 0.35) * 0.9 + reverb(arps, 0.25) * 0.85 + reverb(keys, 0.45) * 0.9 + reverb(fx, 0.2) * 0.9)
+    mix = (drums * 0.75 + bass + reverb(lead, 0.3) * 1.0 + reverb(pads, 0.35) * 1.0 + reverb(arps, 0.25) * 0.85 + reverb(keys, 0.45) * 0.9 + reverb(fx, 0.2) * 0.9)
     mix = hp(mix, 25)
     mix = mix / np.percentile(np.abs(mix), 99.95) * 0.85
     mix = np.tanh(mix * 0.9) / np.tanh(0.9)

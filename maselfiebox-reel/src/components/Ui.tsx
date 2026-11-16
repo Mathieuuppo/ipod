@@ -47,7 +47,10 @@ export const StepTitle: React.FC<{
   y?: number;
   size?: number;
   numSize?: number;
-}> = ({num, lines, f, start, exitStart, x = 80, y = 262, size = 92, numSize = 150}) => {
+}> = ({num, lines, f, start, exitStart, x = 80, y = 262, size: sizeIn = 92, numSize = 150}) => {
+  const longest = Math.max(...lines.map((l) => l.length));
+  const avail = 1080 - 2 * x - (numSize * 1.3 + 106);
+  const size = Math.min(sizeIn, Math.floor(avail / (longest * 0.74)));
   const p = seg(f, start, 30, E.outExpo);
   const ex = exitStart !== undefined ? seg(f, exitStart, 20, E.inExpo) : 0;
   const dash = seg(f, start + 8, 24, E.outExpo);
@@ -248,7 +251,10 @@ export const Headline: React.FC<{
   mode?: 'rise' | 'drop' | 'blur' | 'scale';
   color?: string;
   stagger?: number;
-}> = ({lines, f, start, exitStart, size = 76, x = 80, y, align = 'left', mode = 'rise', color, stagger = 1.3}) => (
+}> = ({lines, f, start, exitStart, size: sizeIn = 76, x = 80, y, align = 'left', mode = 'rise', color, stagger = 1.3}) => {
+  const longest = Math.max(...lines.map((l) => l.length));
+  const size = Math.min(sizeIn, Math.floor((align === 'center' ? 940 : 1080 - 2 * x) / (longest * 0.74)));
+  return (
   <div
     style={{
       position: 'absolute',
@@ -275,4 +281,5 @@ export const Headline: React.FC<{
       />
     ))}
   </div>
-);
+  );
+};

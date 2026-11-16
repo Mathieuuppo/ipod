@@ -42,7 +42,7 @@ export const MaSelfieBoxReel: React.FC = () => (
       </Sequence>
     ))}
     <Grain opacity={0.035} />
-    <Audio src={staticFile('audio/music-maselfiebox-reel-120bpm.wav')} volume={0.55} />
+    <Audio src={staticFile('audio/music-maselfiebox-reel-120bpm.wav')} volume={0.95} />
     <SfxTrack />
   </AbsoluteFill>
 );

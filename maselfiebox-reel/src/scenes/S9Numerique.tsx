@@ -83,7 +83,7 @@ export const S9Numerique: React.FC = () => {
   return (
     <AbsoluteFill>
       <div style={{position: 'absolute', left: 80, top: 262}}>
-        <KineticText text="ET VOS PHOTOS ?" f={f} start={4} size={96} mode="rise" stagger={1.4} exitStart={250} />
+        <KineticText text="ET VOS PHOTOS ?" f={f} start={4} size={84} mode="rise" stagger={1.4} exitStart={250} />
       </div>
       <Headline lines={['TOUTES VOS', 'PHOTOS']} f={f} start={72} y={420} size={104} exitStart={152} />
       <Headline lines={['EN VERSION', 'NUMÉRIQUE']} f={f} start={160} y={420} size={104} exitStart={252} />
